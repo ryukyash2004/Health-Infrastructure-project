@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 class PatientInput(BaseModel):
+    patient_name: str
     symptoms: str
 
 class TriageResponse(BaseModel):
