@@ -35,7 +35,8 @@ This project is managed using **Turborepo** and **pnpm**.
 
 ### Prerequisites
 - Node.js (>=18)
-- pnpm (>=9)
+-
+ (>=9)
 
 ### Key Commands
 ```bash
@@ -139,3 +140,16 @@ For multi-step tasks, state a brief plan:
 2. [Step] → verify: [check]
 3. [Step] → verify: [check]
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+# Project Aegis: Technical Standards
+
+## Tech Stack
+- Frontend: Next.js 14 (App Router), Tailwind CSS, Zustand (State Management)
+- Backend: FastAPI, PostgreSQL + pgvector
+- AI: Ollama (Meditron/LLaVA) + Web Speech API
+
+## Critical Constraints
+1. **Privacy:** All medical data stays in the local Postgres instance. 
+2. **SOS:** Emergency triggers must offer direct dial (112) or Google Maps redirect.
+3. **Forms:** 2-tap confirmation flow (Edit -> Review -> Confirm).
+4. **Context:** Patient profile data (Allergies/History) must be included in AI Triage prompts.
