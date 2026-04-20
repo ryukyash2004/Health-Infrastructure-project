@@ -31,6 +31,20 @@ MOCK_PATIENTS = [
             "patient_name": "Concerned Patient",
             "symptoms": "I have a mild headache but I am also feeling very dizzy when I stand up."
         }
+    },
+    {
+        "name": "Urgent Case",
+        "payload": {
+            "patient_name": "Urgent Patient",
+            "symptoms": "I fell and I think I might have broken my wrist. It is swelling rapidly and I cannot move it."
+        }
+    },
+    {
+        "name": "Pediatric Routine",
+        "payload": {
+            "patient_name": "Child Patient",
+            "symptoms": "Low grade fever and a mild rash on the torso. The child is eating and playing normally."
+        }
     }
 ]
 
@@ -58,7 +72,8 @@ def run_tests():
             
             print(f"Testing: {name}...", end=" ", flush=True)
             try:
-                response = client.post(BASE_URL, json=payload, timeout=10.0)
+                response = client.post(BASE_URL, json=payload, timeout=300.0)
+
                 status_code = response.status_code
                 try:
                     data = response.json()

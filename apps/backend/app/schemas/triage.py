@@ -6,5 +6,5 @@ class PatientInput(BaseModel):
 
 class TriageResponse(BaseModel):
     assessment: str
-    severity: int  # 1: Critical, 2: Serious, 3: Routine
+    severity: int  # 1: Routine, 2-4: Urgent, 5: Critical (Red Flag)
     is_red_flag: bool
