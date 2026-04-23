@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routers import triage, patients
+from app.api.routers import triage, patients, clinical
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,6 +27,12 @@ app.include_router(
     patients.router,
     prefix=f"{settings.API_V1_STR}/patients",
     tags=["patients"]
+)
+
+app.include_router(
+    clinical.router,
+    prefix=f"{settings.API_V1_STR}/clinical",
+    tags=["clinical"]
 )
 
 @app.get("/")
