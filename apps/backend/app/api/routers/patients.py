@@ -8,5 +8,10 @@ async def update_patient_profile(profile: PatientProfile):
     """
     Updates the patient's clinical baseline profile.
     """
-    print(f"DEBUG: Received profile update: {profile.model_dump()}")
-    return {"status": "success", "message": "Profile updated successfully"}
+    print(f"\n[BACKEND] Received Clinical Record Update:")
+    print(f"Patient: {profile.patient_name}")
+    print(f"History: {profile.baseline_history}")
+    print(f"Allergies: {profile.lethal_allergies}")
+    print("-" * 30)
+    
+    return {"status": "success"}
