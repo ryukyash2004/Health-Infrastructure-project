@@ -1,7 +1,8 @@
 "use client";
 
-import { X, History, ClipboardEdit, AlertCircle } from "lucide-react";
+import { X, History, ClipboardEdit, AlertCircle, Loader2 } from "lucide-react";
 import { useStore } from "../store/useStore";
+import { useState, FormEvent } from "react";
 
 export default function Modals() {
   const { 
@@ -10,13 +11,41 @@ export default function Modals() {
     isSosOpen,
     toggleLeftMenu, 
     toggleMedicalForm,
-    toggleSos
+    toggleSos,
+    submitMedicalProfile
   } = useStore();
 
+  const [formData, setFormData] = useState({
+    patientName: "",
+    age: "",
+    gender: "",
+    medicalHistory: "",
+    allergies: "",
+    aiDiagnosis: "",
+    doctorDiagnosis: "",
+    differentialDiagnosis: "",
+    testsDone: ""
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    await submitMedicalProfile(formData);
+    setIsSubmitting(false);
+  };
+
   const formFields = [
-    "Patient Name", "Age", "Gender", "Medical History", 
-    "Allergies", "AI Diagnosis", "Doctor Diagnosis", 
-    "Differential Diagnosis", "Tests done"
+    { id: "patientName", label: "Patient Name" },
+    { id: "age", label: "Age" },
+    { id: "gender", label: "Gender" },
+    { id: "medicalHistory", label: "Medical History" },
+    { id: "allergies", label: "Allergies" },
+    { id: "aiDiagnosis", label: "AI Diagnosis" },
+    { id: "doctorDiagnosis", label: "Doctor Diagnosis" },
+    { id: "differentialDiagnosis", label: "Differential Diagnosis" },
+    { id: "testsDone", label: "Tests done" }
   ];
 
   return (
@@ -86,21 +115,29 @@ export default function Modals() {
             <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
-        <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
           {formFields.map((field) => (
-            <div key={field} className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-600 ml-1">{field}</label>
+            <div key={field.id} className="space-y-1.5">
+              <label htmlFor={field.id} className="text-sm font-medium text-gray-600 ml-1">{field.label}</label>
               <input 
+                id={field.id}
                 type="text" 
-                placeholder={`Enter ${field.toLowerCase()}...`}
+                value={(formData as any)[field.id]}
+                onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                placeholder={`Enter ${field.label.toLowerCase()}...`}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all"
               />
             </div>
           ))}
-          <button className="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl mt-4 hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200">
-            Save Records
+          <button 
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl mt-4 hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200 flex items-center justify-center gap-2 disabled:bg-gray-400"
+          >
+            {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSubmitting ? 'Saving...' : 'Save Records'}
           </button>
-        </div>
+        </form>
       </div>
     </>
   );
