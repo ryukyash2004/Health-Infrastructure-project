@@ -5,86 +5,45 @@ interface Message {
   content: string;
 }
 
-export interface IntakeData {
-  fullName: string;
-  age: string;
-  gender: string;
-  bloodGroup: string;
-  contactNumber: string;
-  conditions: string[];
-  otherIllness: string;
-  sleepCycle: string;
-  badHabits: string[];
-  bowelMovement: string;
-  allergies: string[];
-  allergyDetails: string;
-  vaccinations: string[];
-}
-
 interface UIState {
   isLeftMenuOpen: boolean;
   isMedicalFormOpen: boolean;
   isSosOpen: boolean;
-  isIntakeModalOpen: boolean;
   isIntakeComplete: boolean;
-  intakeData: IntakeData | null;
+  patientHistory: string;
   messages: Message[];
   isLoading: boolean;
-  
   toggleLeftMenu: () => void;
   toggleMedicalForm: () => void;
   toggleSos: () => void;
-  setIntakeModalOpen: (open: boolean) => void;
-  setIntakeData: (data: IntakeData) => void;
+  setIntakeComplete: (complete: boolean) => void;
+  setPatientHistory: (history: string) => void;
   closeAll: () => void;
   
   sendMessage: (text: string) => Promise<void>;
   submitMedicalProfile: (data: any) => Promise<void>;
 }
 
-const initialIntakeData: IntakeData = {
-  fullName: '',
-  age: '',
-  gender: '',
-  bloodGroup: '',
-  contactNumber: '',
-  conditions: [],
-  otherIllness: '',
-  sleepCycle: '',
-  badHabits: [],
-  bowelMovement: '',
-  allergies: [],
-  allergyDetails: '',
-  vaccinations: [],
-};
-
 export const useStore = create<UIState>((set, get) => ({
   isLeftMenuOpen: false,
   isMedicalFormOpen: false,
   isSosOpen: false,
-  isIntakeModalOpen: true, // Open by default for new users
   isIntakeComplete: false,
-  intakeData: null,
+  patientHistory: '',
   messages: [],
   isLoading: false,
 
   toggleLeftMenu: () => set((state) => ({ isLeftMenuOpen: !state.isLeftMenuOpen })),
   toggleMedicalForm: () => set((state) => ({ isMedicalFormOpen: !state.isMedicalFormOpen })),
   toggleSos: () => set((state) => ({ isSosOpen: !state.isSosOpen })),
-  setIntakeModalOpen: (open: boolean) => set({ isIntakeModalOpen: open }),
-  setIntakeData: (data: IntakeData) => set({ intakeData: data, isIntakeComplete: true, isIntakeModalOpen: false }),
-  
-  closeAll: () => set({ 
-    isLeftMenuOpen: false, 
-    isMedicalFormOpen: false, 
-    isSosOpen: false, 
-    isIntakeModalOpen: false 
-  }),
+  setIntakeComplete: (complete) => set({ isIntakeComplete: complete }),
+  setPatientHistory: (history) => set({ patientHistory: history }),
+  closeAll: () => set({ isLeftMenuOpen: false, isMedicalFormOpen: false, isSosOpen: false }),
 
   sendMessage: async (text: string) => {
     if (!text.trim()) return;
 
-    const { intakeData } = get();
+    const { patientHistory } = get();
 
     // Append user message
     const userMessage: Message = { role: 'user', content: text };
@@ -102,10 +61,9 @@ export const useStore = create<UIState>((set, get) => ({
           'X-User-ID': 'user_123'
         },
         body: JSON.stringify({
-          patient_name: intakeData?.fullName || 'Guest Patient',
+          patient_name: 'Patient', 
           symptoms: text,
-          // Pass the complete intake profile for clinical context
-          clinical_context: intakeData 
+          patient_history: patientHistory || "No history provided."
         }),
       });
 

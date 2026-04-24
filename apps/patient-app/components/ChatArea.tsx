@@ -19,7 +19,7 @@ export default function ChatArea() {
           Hi, what can I help you with?
         </h1>
         
-        <div className="flex flex-wrap justify-center gap-2 max-w-md animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="flex flex-wrap justify-center gap-3 max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
           {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
