@@ -96,7 +96,7 @@ export default function InputBar() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md max-w-2xl mx-auto z-40">
+    <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-white/80 backdrop-blur-md max-w-4xl lg:max-w-5xl mx-auto z-40 transition-all">
       {/* Image Preview */}
       {previewUrl && (
         <div className="mb-2 relative inline-block animate-in fade-in zoom-in duration-200">
@@ -112,7 +112,7 @@ export default function InputBar() {
         </div>
       )}
 
-      <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-3xl px-4 py-2 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-100 transition-all">
+      <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-2xl md:rounded-3xl px-4 md:px-6 py-3 md:py-4 shadow-sm focus-within:border-gray-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
         <input 
           type="file" 
           ref={fileInputRef}

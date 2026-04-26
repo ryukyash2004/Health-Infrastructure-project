@@ -51,3 +51,5 @@ coverage/
 .pytest_cache/
 __pycache__/
 *.py[cod]
+__pycache__/
+*.pyc

@@ -1,133 +1,154 @@
 "use client";
 
-import { useState } from 'react';
-import { useStore, IntakeData } from '../store/useStore';
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  Check, 
-  User, 
-  Activity, 
-  Stethoscope, 
-  ShieldCheck,
-  AlertCircle
-} from 'lucide-react';
-
-const STEPS = [
-  { id: 1, title: 'Demographics', icon: User },
-  { id: 2, title: 'Medical History', icon: Activity },
-  { id: 3, title: 'Lifestyle', icon: Stethoscope },
-  { id: 4, title: 'Safety', icon: ShieldCheck },
-];
+import React, { useState } from 'react';
+import { useStore } from '../store/useStore';
+import { ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 
 export default function IntakeForm() {
-  const { setIntakeData, isIntakeModalOpen } = useStore();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<IntakeData>({
+  const { setPatientHistory, setIntakeComplete } = useStore();
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({
+    // Step 1
     fullName: '',
     age: '',
     gender: '',
     bloodGroup: '',
     contactNumber: '',
-    conditions: [],
-    otherIllness: '',
+    // Step 2
+    conditions: {
+      hypertension: false,
+      diabetes: false,
+      asthma: false,
+      thyroid: false
+    },
+    otherHistory: '',
+    // Step 3
     sleepCycle: '',
-    badHabits: [],
+    badHabits: {
+      smoking: false,
+      alcohol: false
+    },
     bowelMovement: '',
-    allergies: [],
-    allergyDetails: '',
-    vaccinations: [],
+    // Step 4
+    allergies: {
+      drug: false,
+      food: false,
+      environment: false
+    },
+    allergyReaction: '',
+    vaccinations: {
+      covid19: false,
+      tetanus: false,
+      hepatitisB: false
+    }
   });
 
-  if (!isIntakeModalOpen) return null;
-
-  const nextStep = () => setCurrentStep((s) => Math.min(s + 1, STEPS.length));
-  const prevStep = () => setCurrentStep((s) => Math.max(s - 1, 1));
-
-  const handleToggle = (field: keyof IntakeData, value: string) => {
-    setFormData((prev) => {
-      const current = prev[field] as string[];
-      if (current.includes(value)) {
-        return { ...prev, [field]: current.filter((v) => v !== value) };
-      }
-      return { ...prev, [field]: [...current, value] };
-    });
-  };
+  const nextStep = () => setStep(step + 1);
+  const prevStep = () => setStep(step - 1);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentStep < STEPS.length) {
-      nextStep();
-    } else {
-      setIntakeData(formData);
-    }
+    
+    // Compile data into a formatted string
+    const historyParts = [];
+    historyParts.push(`Name: ${formData.fullName}`);
+    historyParts.push(`Age: ${formData.age}`);
+    historyParts.push(`Gender: ${formData.gender}`);
+    historyParts.push(`Blood Group: ${formData.bloodGroup}`);
+    
+    const conditions = Object.entries(formData.conditions)
+      .filter(([_, value]) => value)
+      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
+      .join(', ');
+    if (conditions) historyParts.push(`Conditions: ${conditions}`);
+    if (formData.otherHistory) historyParts.push(`Other History: ${formData.otherHistory}`);
+    
+    historyParts.push(`Sleep: ${formData.sleepCycle}`);
+    
+    const habits = Object.entries(formData.badHabits)
+      .filter(([_, value]) => value)
+      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
+      .join(', ');
+    if (habits) historyParts.push(`Habits: ${habits}`);
+    
+    historyParts.push(`Bowel: ${formData.bowelMovement}`);
+    
+    const allergies = Object.entries(formData.allergies)
+      .filter(([_, value]) => value)
+      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
+      .join(', ');
+    if (allergies) historyParts.push(`Allergies: ${allergies} (${formData.allergyReaction})`);
+    
+    const vaccines = Object.entries(formData.vaccinations)
+      .filter(([_, value]) => value)
+      .map(([key, _]) => key === 'covid19' ? 'COVID-19' : key.charAt(0).toUpperCase() + key.slice(1))
+      .join(', ');
+    if (vaccines) historyParts.push(`Vaccines: ${vaccines}`);
+
+    const finalHistoryString = historyParts.join(' | ');
+    setPatientHistory(finalHistoryString);
+    setIntakeComplete(true);
   };
 
-  const progress = (currentStep / STEPS.length) * 100;
+  const progress = (step / 4) * 100;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
-        
-        {/* Progress Header */}
-        <div className="p-8 pb-4">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900">Pre-Consultation</h2>
-              <p className="text-gray-500 text-sm font-bold">Step {currentStep} of {STEPS.length}: {STEPS[currentStep - 1].title}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
-              {(() => {
-                const Icon = STEPS[currentStep - 1].icon;
-                return <Icon className="w-6 h-6" />;
-              })()}
-            </div>
-          </div>
-          
-          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-blue-600 transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col md:max-w-4xl lg:max-w-5xl md:mx-auto md:shadow-2xl overflow-hidden md:my-10 md:rounded-3xl">
+      {/* Progress Header */}
+      <div className="p-6 border-b border-slate-100">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-slate-800">Pre-Consultation</h2>
+          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Step {step} of 4</span>
         </div>
+        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-blue-600 transition-all duration-500 ease-out" 
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 pt-4">
-          
-          {/* Step 1: Demographics */}
-          {currentStep === 1 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+        {/* Step 1: Basic Demographics */}
+        {step === 1 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">Basic Demographics</h3>
+              <p className="text-sm text-slate-500">Please provide your basic information to get started.</p>
+            </div>
+            
+            <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
                 <input 
                   required
-                  type="text"
+                  type="text" 
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
                   placeholder="e.g. Priya Sharma"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Age</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Age</label>
                   <input 
                     required
-                    type="number"
+                    type="number" 
                     value={formData.age}
-                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    onChange={(e) => setFormData({...formData, age: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
                     placeholder="28"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Gender</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Gender</label>
                   <select 
                     required
                     value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all appearance-none"
                   >
                     <option value="">Select</option>
                     <option value="Male">Male</option>
@@ -139,12 +160,12 @@ export default function IntakeForm() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Blood Group</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Blood Group</label>
                   <select 
                     required
                     value={formData.bloodGroup}
-                    onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+                    onChange={(e) => setFormData({...formData, bloodGroup: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all appearance-none"
                   >
                     <option value="">Select</option>
                     {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
@@ -153,197 +174,235 @@ export default function IntakeForm() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Contact Number</label>
                   <input 
                     required
-                    type="tel"
+                    type="tel" 
                     value={formData.contactNumber}
-                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                    placeholder="+91 987..."
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all"
+                    onChange={(e) => setFormData({...formData, contactNumber: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
+                    placeholder="+91 98765 43210"
                   />
                 </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Step 2: Past Medical History */}
-          {currentStep === 2 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Existing Conditions</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Hypertension', 'Diabetes', 'Asthma', 'Thyroid'].map((cond) => (
+        {/* Step 2: Past Medical History */}
+        {step === 2 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">Medical History</h3>
+              <p className="text-sm text-slate-500">Do you have any pre-existing medical conditions?</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {['hypertension', 'diabetes', 'asthma', 'thyroid'].map((cond) => (
+                <button
+                  key={cond}
+                  type="button"
+                  onClick={() => setFormData({
+                    ...formData, 
+                    conditions: {...formData.conditions, [cond]: !formData.conditions[cond as keyof typeof formData.conditions]}
+                  })}
+                  className={`flex items-center gap-3 p-4 rounded-xl border text-sm font-medium transition-all ${
+                    formData.conditions[cond as keyof typeof formData.conditions]
+                    ? 'bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                    formData.conditions[cond as keyof typeof formData.conditions] ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
+                  }`}>
+                    {formData.conditions[cond as keyof typeof formData.conditions] && <CheckCircle2 className="w-4 h-4 text-white" />}
+                  </div>
+                  {cond.charAt(0).toUpperCase() + cond.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Other history, surgeries, or medications</label>
+              <textarea 
+                value={formData.otherHistory}
+                onChange={(e) => setFormData({...formData, otherHistory: e.target.value})}
+                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
+                placeholder="List any past surgeries or other illnesses..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Lifestyle & Generals */}
+        {step === 3 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">Lifestyle & Habits</h3>
+              <p className="text-sm text-slate-500">Help us understand your daily routine.</p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Average Sleep Cycle</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['<5 hrs', '6-8 hrs', '>8 hrs'].map((val) => (
                     <button
-                      key={cond}
+                      key={val}
                       type="button"
-                      onClick={() => handleToggle('conditions', cond)}
-                      className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-xs font-black ${
-                        formData.conditions.includes(cond)
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200'
-                          : 'bg-gray-50 border-gray-100 text-gray-600 hover:border-blue-300'
+                      onClick={() => setFormData({...formData, sleepCycle: val})}
+                      className={`py-2.5 rounded-lg border text-xs font-bold transition-all ${
+                        formData.sleepCycle === val
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'bg-white border-slate-200 text-slate-600'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center border ${formData.conditions.includes(cond) ? 'bg-white/20 border-white/40' : 'bg-white border-gray-200'}`}>
-                        {formData.conditions.includes(cond) && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      {cond}
+                      {val}
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Bad Habits</label>
+                <div className="flex gap-4">
+                  {['smoking', 'alcohol'].map((habit) => (
+                    <label key={habit} className="flex items-center gap-2.5 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.badHabits[habit as keyof typeof formData.badHabits]}
+                        onChange={() => setFormData({
+                          ...formData, 
+                          badHabits: {...formData.badHabits, [habit]: !formData.badHabits[habit as keyof typeof formData.badHabits]}
+                        })}
+                        className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700 capitalize group-hover:text-blue-600">{habit}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Bowel Movement</label>
+                <select 
+                  required
+                  value={formData.bowelMovement}
+                  onChange={(e) => setFormData({...formData, bowelMovement: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                >
+                  <option value="">Select</option>
+                  <option value="Regular">Regular</option>
+                  <option value="Constipated">Constipated</option>
+                  <option value="Irregular">Irregular</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Allergies & Vaccinations */}
+        {step === 4 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">Safety & Vaccinations</h3>
+              <p className="text-sm text-slate-500">Final checks before starting the triage.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Known Allergies</label>
+                <div className="flex flex-wrap gap-4">
+                  {['drug', 'food', 'environment'].map((type) => (
+                    <label key={type} className="flex items-center gap-2.5 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.allergies[type as keyof typeof formData.allergies]}
+                        onChange={() => setFormData({
+                          ...formData, 
+                          allergies: {...formData.allergies, [type]: !formData.allergies[type as keyof typeof formData.allergies]}
+                        })}
+                        className="w-5 h-5 rounded border-slate-300 text-red-500 focus:ring-red-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700 capitalize group-hover:text-red-600">{type} Allergy</span>
+                    </label>
                   ))}
                 </div>
               </div>
               
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Other History</label>
-                <textarea 
-                  value={formData.otherIllness}
-                  onChange={(e) => setFormData({ ...formData, otherIllness: e.target.value })}
-                  placeholder="Any surgeries, chronic illnesses, or hospitalizations..."
-                  className="w-full h-32 bg-gray-50 border border-gray-100 rounded-[1.5rem] p-5 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-600 transition-all resize-none shadow-inner"
-                />
-              </div>
+              <input 
+                type="text" 
+                value={formData.allergyReaction}
+                onChange={(e) => setFormData({...formData, allergyReaction: e.target.value})}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                placeholder="Specify the reaction (e.g. Skin rash, swelling)..."
+              />
             </div>
-          )}
 
-          {/* Step 3: Lifestyle */}
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Vaccination Status</label>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Average Sleep Cycle</label>
-                <select 
-                  required
-                  value={formData.sleepCycle}
-                  onChange={(e) => setFormData({ ...formData, sleepCycle: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="">Select Sleep Hours</option>
-                  <option value="Less than 5 hrs">Less than 5 hrs</option>
-                  <option value="6-8 hrs">6-8 hrs</option>
-                  <option value="More than 8 hrs">More than 8 hrs</option>
-                </select>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Habits</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Smoking', 'Alcohol', 'None'].map((habit) => (
-                    <button
-                      key={habit}
-                      type="button"
-                      onClick={() => handleToggle('badHabits', habit)}
-                      className={`px-6 py-3 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all ${
-                        formData.badHabits.includes(habit)
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
-                          : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-blue-200'
-                      }`}
-                    >
-                      {habit}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bowel Movement</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Regular', 'Constipated', 'Irregular'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, bowelMovement: type })}
-                      className={`px-3 py-3 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all ${
-                        formData.bowelMovement === type
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
-                          : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-blue-200'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
+                {[
+                  { id: 'covid19', label: 'COVID-19 Vaccine' },
+                  { id: 'tetanus', label: 'Tetanus' },
+                  { id: 'hepatitisB', label: 'Hepatitis B' }
+                ].map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData, 
+                      vaccinations: {...formData.vaccinations, [v.id]: !formData.vaccinations[v.id as keyof typeof formData.vaccinations]}
+                    })}
+                    className={`flex items-center justify-between w-full p-4 rounded-xl border text-sm font-bold transition-all ${
+                      formData.vaccinations[v.id as keyof typeof formData.vaccinations]
+                      ? 'bg-emerald-50 border-emerald-600 text-emerald-700 ring-1 ring-emerald-600'
+                      : 'bg-white border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {v.label}
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                      formData.vaccinations[v.id as keyof typeof formData.vaccinations] ? 'bg-emerald-600 border-emerald-600' : 'bg-white border-slate-300'
+                    }`}>
+                      {formData.vaccinations[v.id as keyof typeof formData.vaccinations] && <CheckCircle2 className="w-4 h-4 text-white" />}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
-
-          {/* Step 4: Safety (Allergies & Vaccinations) */}
-          {currentStep === 4 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                  <AlertCircle className="w-3 h-3" /> Known Allergies
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {['Drug', 'Food', 'Environment'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => handleToggle('allergies', type)}
-                      className={`px-6 py-3 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all ${
-                        formData.allergies.includes(type)
-                          ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-100'
-                          : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-red-200'
-                      }`}
-                    >
-                      {type} Allergy
-                    </button>
-                  ))}
-                </div>
-                <input 
-                  type="text"
-                  value={formData.allergyDetails}
-                  onChange={(e) => setFormData({ ...formData, allergyDetails: e.target.value })}
-                  placeholder="Specify allergic reactions (e.g. Skin rash, sneezing)..."
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white focus:border-red-600 transition-all"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Key Vaccinations</label>
-                <div className="space-y-2">
-                  {['COVID-19', 'Tetanus', 'Hepatitis B'].map((vaccine) => (
-                    <button
-                      key={vaccine}
-                      type="button"
-                      onClick={() => handleToggle('vaccinations', vaccine)}
-                      className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                        formData.vaccinations.includes(vaccine)
-                          ? 'bg-emerald-50 border-emerald-500 text-emerald-900'
-                          : 'bg-gray-50 border-gray-100 text-gray-500'
-                      }`}
-                    >
-                      <span className="text-xs font-black">{vaccine} Vaccine</span>
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
-                        formData.vaccinations.includes(vaccine) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-transparent'
-                      }`}>
-                        <Check className="w-4 h-4" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="flex items-center gap-4 mt-10">
-            {currentStep > 1 && (
-              <button
-                type="button"
-                onClick={prevStep}
-                className="flex-1 px-8 py-5 border-2 border-gray-100 text-gray-400 rounded-3xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 hover:text-gray-600 transition-all flex items-center justify-center gap-2"
-              >
-                <ChevronLeft className="w-4 h-4" /> Back
-              </button>
-            )}
-            <button
-              type="submit"
-              className={`px-8 py-5 bg-blue-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] hover:shadow-2xl hover:shadow-blue-600/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 ${currentStep === 1 ? 'w-full' : 'flex-[2]'}`}
-            >
-              {currentStep === STEPS.length ? 'Finalize Profile' : 'Continue'}
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
-        </form>
+        )}
+      </form>
+
+      {/* Navigation Footer */}
+      <div className="p-6 border-t border-slate-100 flex gap-4 bg-slate-50/50 backdrop-blur">
+        {step > 1 && (
+          <button 
+            type="button"
+            onClick={prevStep}
+            className="flex-1 px-6 py-3.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
+        )}
+        
+        {step < 4 ? (
+          <button 
+            type="button"
+            onClick={nextStep}
+            className="flex-1 px-6 py-3.5 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
+          >
+            Next <ChevronRight className="w-4 h-4" />
+          </button>
+        ) : (
+          <button 
+            type="button"
+            onClick={handleSubmit}
+            className="flex-1 px-6 py-3.5 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
+          >
+            Finalize Profile <CheckCircle2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );

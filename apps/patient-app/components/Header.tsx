@@ -7,7 +7,7 @@ export default function Header() {
   const { toggleLeftMenu, toggleMedicalForm, toggleSos } = useStore();
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 z-40 max-w-2xl mx-auto">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-6 z-40 max-w-4xl lg:max-w-5xl mx-auto transition-all">
       <button 
         onClick={toggleLeftMenu}
         className="p-2 hover:bg-gray-100 rounded-full transition-colors"
