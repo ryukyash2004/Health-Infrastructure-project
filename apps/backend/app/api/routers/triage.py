@@ -4,6 +4,7 @@ import ollama
 import re
 import json
 import traceback
+from datetime import datetime
 
 from app.schemas.triage import PatientInput, TriageResponse
 from app.core.interceptor import evaluate_red_flags
@@ -12,23 +13,31 @@ from app.models.patient import Patient
 
 router = APIRouter()
 
-# 1. The highly constrained JSON-Scratchpad Prompt
 SYSTEM_PROMPT = """
-You are Meditron, an elite clinical triage AI for Project Aegis.
-You will receive patient symptoms and history. Your job is to assess the clinical risk and provide a differential diagnosis.
+You are Meditron, an expert AI triage assistant. 
 
-CRITICAL RULES:
-1. You must output ONLY valid, raw JSON. No markdown formatting, no text before or after.
-2. You MUST think step-by-step inside the "reasoning_scratchpad" field BEFORE outputting your final assessment.
+INSTRUCTIONS:
+1. Analyze the patient's symptoms and patient history.
+2. Determine a severity level (1-5, where 5 is an emergency).
+3. Provide up to 3 differential diagnoses.
+4. Write a polite, 2-sentence empathetic response addressing the patient's specific symptom.
+5. You MUST output ONLY valid JSON.
 
-Use this EXACT JSON format:
+EXAMPLE INPUT:
+"I have a sharp pain in my lower right abdomen."
+
+EXAMPLE OUTPUT:
 {
-  "reasoning_scratchpad": "1. Analyze symptoms. 2. Note patient history. 3. Identify red flags. 4. Determine diagnoses.",
-  "severity_level": 3,
-  "differential_diagnosis": ["Diagnosis A", "Diagnosis B", "Diagnosis C"],
-  "patient_message": "A polite, concise message to the patient explaining the assessment."
+  "reasoning_scratchpad": "Right lower quadrant pain is highly suspicious for appendicitis. Requires urgent evaluation.",
+  "severity_level": 4,
+  "differential_diagnosis": ["Acute Appendicitis", "Ovarian Cyst Rupture", "Kidney Stone"],
+  "patient_message": "I understand you are experiencing severe abdominal pain, which sounds very uncomfortable. I have logged this with the clinic and a doctor will review your case shortly."
 }
+
+Now, process the user's actual input. GENERATE A BRAND NEW JSON RESPONSE. DO NOT COPY THE EXAMPLE ABOVE.
 """
+
+@router.post("/assessment")
 
 async def get_meditron_assessment(symptoms: str, patient_history: str):
     """
@@ -94,6 +103,8 @@ async def perform_triage(patient_data: PatientInput, db: AsyncSession = Depends(
     """
     is_red_flag = evaluate_red_flags(patient_data.symptoms)
     
+    now_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
+    
     if is_red_flag:
         assessment = "CRITICAL: Life-threatening symptom detected. Emergency protocols initiated. Please call 911 immediately or proceed to the nearest ER."
         severity = 5
@@ -103,15 +114,20 @@ async def perform_triage(patient_data: PatientInput, db: AsyncSession = Depends(
         new_patient = Patient(
             patient_name=patient_data.patient_name,
             symptoms=patient_data.symptoms,
+            patient_history=patient_data.patient_history,
             assessment=assessment,
             severity=severity,
-            is_red_flag=True
+            is_red_flag=True,
+            differential_diagnosis=diff_dx,
+            visit_date=now_str,
+            visit_type="EMERGENCY"
         )
         db.add(new_patient)
         await db.commit()
         await db.refresh(new_patient)
         
         return TriageResponse(
+            patient_id=new_patient.id,
             assessment=assessment,
             severity=severity,
             is_red_flag=True,
@@ -126,20 +142,23 @@ async def perform_triage(patient_data: PatientInput, db: AsyncSession = Depends(
     )
     
     # Save Routine/Urgent record to database
-    # Note: We are saving the patient_message as the DB 'assessment'. 
-    # If you later want to save the Differential Diagnosis to the DB, you will need to add a JSON/Array column to your Patient model.
     new_patient = Patient(
         patient_name=patient_data.patient_name,
         symptoms=patient_data.symptoms,
+        patient_history=history_str,
         assessment=ai_assessment,
         severity=ai_severity,
-        is_red_flag=False
+        is_red_flag=False,
+        differential_diagnosis=ai_diff_dx,
+        visit_date=now_str,
+        visit_type="OPD"
     )
     db.add(new_patient)
     await db.commit()
     await db.refresh(new_patient)
     
     return TriageResponse(
+        patient_id=new_patient.id,
         assessment=ai_assessment,
         severity=ai_severity,
         is_red_flag=False,

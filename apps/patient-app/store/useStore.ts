@@ -13,6 +13,7 @@ interface UIState {
   patientHistory: string;
   messages: Message[];
   isLoading: boolean;
+  caseId: number | null;
   toggleLeftMenu: () => void;
   toggleMedicalForm: () => void;
   toggleSos: () => void;
@@ -32,6 +33,7 @@ export const useStore = create<UIState>((set, get) => ({
   patientHistory: '',
   messages: [],
   isLoading: false,
+  caseId: null,
 
   toggleLeftMenu: () => set((state) => ({ isLeftMenuOpen: !state.isLeftMenuOpen })),
   toggleMedicalForm: () => set((state) => ({ isMedicalFormOpen: !state.isMedicalFormOpen })),
@@ -78,7 +80,8 @@ export const useStore = create<UIState>((set, get) => ({
 
       set((state) => ({ 
         messages: [...state.messages, aiMessage],
-        isLoading: false 
+        isLoading: false,
+        caseId: data.patient_id
       }));
     } catch (error) {
       console.error('Error sending message:', error);
