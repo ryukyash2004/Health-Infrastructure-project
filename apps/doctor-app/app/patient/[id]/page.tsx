@@ -26,6 +26,9 @@ import {
   ChevronDown,
   ArrowLeft
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { signout } from '../../login/actions';
+import { useBackendStatus } from '@/components/BackendStatus';
 import MedicalAutocomplete from '../../../components/MedicalAutocomplete';
 
 // --- Types ---
@@ -36,6 +39,11 @@ interface Medicine {
   frequency: string;
   duration: string;
   instructions: string;
+}
+
+interface FollowUpData {
+  date: string;
+  reason: string;
 }
 
 interface Differential {
@@ -55,10 +63,12 @@ interface PatientData {
   contact: string;
   visit_date: string;
   visit_type: string;
+  status: string;
   clinical_data: {
     patient_complaint: string;
     history_of_present_illness: string;
     past_history: string[];
+    doctor_notes?: string;
     ai_assessment: {
       severity_level: number;
       differential_diagnosis: string[];
@@ -70,14 +80,22 @@ export default function PatientDetail() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
+  const { setUnreachable } = useBackendStatus();
   
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Visit Form State
   const [medicines, setMedicines] = useState<Medicine[]>([
     { id: '1', name: 'Metformin 500mg', dose: '1 tablet', frequency: 'Twice daily', duration: '14 Days', instructions: 'After meals' }
   ]);
+  const [doctorNotes, setDoctorNotes] = useState("");
+  const [followUp, setFollowUp] = useState<FollowUpData>({
+    date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    reason: ""
+  });
   
   const [differentials, setDifferentials] = useState<Differential[]>([
     { id: '1', diagnosis: 'Acute Gastritis', reason: 'Epigastric tenderness, relationship with spicy food', investigation: 'H. pylori Breath Test' }
@@ -94,13 +112,20 @@ export default function PatientDetail() {
       }
       const data = await response.json();
       setPatient(data);
+      if (data.clinical_data?.doctor_notes) {
+        setDoctorNotes(data.clinical_data.doctor_notes);
+      }
+      setUnreachable(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof Error && err.message === 'Failed to fetch') {
+        setUnreachable(true);
+      }
       setPatient(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setUnreachable]);
 
   useEffect(() => {
     if (id) {
@@ -116,8 +141,60 @@ export default function PatientDetail() {
     setMedicines(medicines.filter(m => m.id !== id));
   };
 
+  const updateMedicine = (id: string, field: keyof Medicine, value: string) => {
+    setMedicines(medicines.map(m => m.id === id ? { ...m, [field]: value } : m));
+  };
+
   const addDifferential = () => {
     setDifferentials([...differentials, { id: Date.now().toString(), diagnosis: '', reason: '', investigation: '' }]);
+  };
+
+  const handleSaveVisit = async () => {
+    if (!patient) return;
+    
+    setSaving(true);
+    const promise = async () => {
+      const payload = {
+        doctor_notes: doctorNotes,
+        prescriptions: medicines.map(m => ({
+          medication: m.name,
+          dosage: m.dose,
+          frequency: m.frequency,
+          duration: m.duration,
+          instructions: m.instructions
+        })),
+        follow_ups: [
+          {
+            follow_up_date: followUp.date,
+            reason: followUp.reason
+          }
+        ]
+      };
+
+      const response = await fetch(`http://localhost:8000/api/v1/patients/${patient.db_id}/visit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save visit data');
+      }
+
+      return await response.json();
+    };
+
+    toast.promise(promise(), {
+      loading: 'Saving clinical assessment...',
+      success: (data) => {
+        setSaving(false);
+        return `Visit for ${patient.name} completed successfully!`;
+      },
+      error: (err) => {
+        setSaving(false);
+        return err.message;
+      }
+    });
   };
 
   if (loading) {
@@ -183,7 +260,10 @@ export default function PatientDetail() {
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors">
+          <button 
+            onClick={() => signout()}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+          >
             <LogOut className="w-4 h-4" />
             Logout
           </button>
@@ -491,7 +571,7 @@ export default function PatientDetail() {
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Standardized ICD-10 Code</label>
                     <MedicalAutocomplete 
                       type="icd10" 
-                      onSelect={(val) => console.log('ICD-10:', val)}
+                      onSelect={(val) => setDoctorNotes(prev => prev ? `${prev} | Diagnosis: ${val}` : `Diagnosis: ${val}`)}
                       placeholder="Search ICD-10 Diagnosis..."
                     />
                   </div>
@@ -500,7 +580,8 @@ export default function PatientDetail() {
                     <textarea 
                       className="w-full h-20 bg-slate-50 border border-slate-200 rounded p-4 text-sm font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
                       placeholder="Final clinical summary..."
-                      defaultValue="Acute Non-Atrophic Gastritis (K29.7). Prescribing PPI and diet modification."
+                      value={doctorNotes}
+                      onChange={(e) => setDoctorNotes(e.target.value)}
                     />
                   </div>
                 </div>
@@ -534,22 +615,42 @@ export default function PatientDetail() {
                           <td className="py-2 px-4">
                             <MedicalAutocomplete 
                               type="rxnorm" 
-                              onSelect={(val) => console.log('Medicine:', val)}
+                              onSelect={(val) => updateMedicine(med.id, 'name', val)}
                               defaultValue={med.name}
                               className="text-xs"
                             />
                           </td>
                           <td className="py-2 px-4 font-bold">
-                            <input type="text" className="w-full bg-transparent outline-none" defaultValue={med.dose} />
+                            <input 
+                              type="text" 
+                              className="w-full bg-transparent outline-none" 
+                              value={med.dose} 
+                              onChange={(e) => updateMedicine(med.id, 'dose', e.target.value)}
+                            />
                           </td>
                           <td className="py-2 px-4">
-                            <input type="text" className="w-full bg-transparent outline-none" defaultValue={med.frequency} />
+                            <input 
+                              type="text" 
+                              className="w-full bg-transparent outline-none" 
+                              value={med.frequency} 
+                              onChange={(e) => updateMedicine(med.id, 'frequency', e.target.value)}
+                            />
                           </td>
                           <td className="py-2 px-4">
-                            <input type="text" className="w-full bg-transparent outline-none font-bold" defaultValue={med.duration} />
+                            <input 
+                              type="text" 
+                              className="w-full bg-transparent outline-none font-bold" 
+                              value={med.duration} 
+                              onChange={(e) => updateMedicine(med.id, 'duration', e.target.value)}
+                            />
                           </td>
                           <td className="py-2 px-4 text-slate-500 italic">
-                            <input type="text" className="w-full bg-transparent outline-none" defaultValue={med.instructions} />
+                            <input 
+                              type="text" 
+                              className="w-full bg-transparent outline-none" 
+                              value={med.instructions} 
+                              onChange={(e) => updateMedicine(med.id, 'instructions', e.target.value)}
+                            />
                           </td>
                           <td className="py-2 px-4 text-right">
                             <button onClick={() => removeMedicine(med.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
@@ -561,14 +662,6 @@ export default function PatientDetail() {
                     </tbody>
                   </table>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Notes for Pharmacist</label>
-                  <textarea 
-                    className="w-full h-20 bg-slate-50 border border-slate-200 rounded p-4 text-sm font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
-                    placeholder="Special instructions (e.g. Do not substitute)..."
-                    defaultValue="Avoid alcohol consumption while on Omeprazole. Take 30 mins before first meal."
-                  />
-                </div>
               </div>
 
               {/* 11. Follow Ups */}
@@ -579,34 +672,21 @@ export default function PatientDetail() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Follow-up Date</label>
-                    <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer" defaultValue="2024-11-01" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Approx. Time</label>
-                    <input type="time" className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer" defaultValue="10:30" />
-                  </div>
-                  <div className="space-y-2 relative">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Consultation Type</label>
-                    <select className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all appearance-none cursor-pointer">
-                      <option>Physical Visit (OPD)</option>
-                      <option>Online Video Consultation</option>
-                      <option>IPD Review</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 bottom-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <input 
+                      type="date" 
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer" 
+                      value={followUp.date} 
+                      onChange={(e) => setFollowUp({ ...followUp, date: e.target.value })}
+                    />
                   </div>
                   <div className="md:col-span-3 space-y-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block">Special Follow-up Instructions</label>
                     <textarea 
                       className="w-full h-24 bg-slate-50 border border-slate-200 rounded p-4 text-sm font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
                       placeholder="Advise patient on what to monitor..."
-                      defaultValue="Return immediately if abdominal pain Radiates to back or if persistent high-grade fever occurs. Bring food diary on next visit."
+                      value={followUp.reason}
+                      onChange={(e) => setFollowUp({ ...followUp, reason: e.target.value })}
                     />
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer w-fit">
-                      <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-600" defaultChecked />
-                      Send automated reminder to patient via WhatsApp and Email
-                    </label>
                   </div>
                 </div>
               </div>
@@ -618,15 +698,25 @@ export default function PatientDetail() {
         {patient && (
           <footer className="fixed bottom-0 right-0 left-64 bg-white/90 backdrop-blur border-t border-slate-200 p-6 z-40">
             <div className="max-w-6xl mx-auto flex items-center justify-end gap-4">
-              <button className="px-6 py-2.5 border border-slate-200 text-slate-500 rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all">
+              <button 
+                className="px-6 py-2.5 border border-slate-200 text-slate-500 rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all"
+                disabled={saving}
+              >
                 Save as Draft
               </button>
-              <button className="px-6 py-2.5 border border-slate-200 text-slate-500 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all">
+              <button 
+                className="px-6 py-2.5 border border-slate-200 text-slate-500 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all"
+                disabled={saving}
+              >
                 Clear All
               </button>
               <div className="h-8 w-px bg-slate-200 mx-2"></div>
-              <button className="px-10 py-3 bg-blue-600 text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-600/10">
-                Save & Complete Visit
+              <button 
+                onClick={handleSaveVisit}
+                disabled={saving}
+                className="px-10 py-3 bg-blue-600 text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save & Complete Visit'}
               </button>
             </div>
           </footer>

@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase
 from .config import settings
 
 # For async, we use the postgresql+asyncpg driver
-SQLALCHEMY_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/aegis"
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 

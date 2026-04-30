@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "../store/useStore";
-import { Bot, User } from "lucide-react";
+import { Bot, User, AlertCircle, RefreshCcw } from "lucide-react";
 
 const SUGGESTIONS = [
   "Help me with diagnosis",
@@ -10,7 +10,7 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatArea() {
-  const { messages, isLoading, sendMessage } = useStore();
+  const { messages, isLoading, sendMessage, error, retryLastMessage } = useStore();
 
   if (messages.length === 0) {
     return (
@@ -62,6 +62,24 @@ export default function ChatArea() {
           <div className="bg-white border border-gray-100 text-gray-500 px-4 py-2.5 rounded-2xl rounded-tl-none text-sm italic">
             Meditron is thinking...
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex flex-col items-center gap-4 py-4 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3 bg-red-50 border border-red-100 px-4 py-3 rounded-2xl max-w-[90%]">
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-red-800 uppercase tracking-widest mb-0.5">{error.type.replace('_', ' ')} ERROR</p>
+              <p className="text-sm text-red-600 font-medium">{error.message}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => retryLastMessage()}
+            className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+          >
+            <RefreshCcw className="w-3.5 h-3.5" /> Retry Request
+          </button>
         </div>
       )}
     </div>

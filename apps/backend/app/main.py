@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routers import triage, patients, clinical
-import httpx
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -12,19 +11,17 @@ async def lifespan(app: FastAPI):
     print("🏥 Starting Project Aegis Backend...")
     print("Checking AI Engine Status...")
     
+    # Check for Gemini configuration
     try:
-        # Ping the Windows host Ollama IP
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://172.20.192.1:11434/", timeout=2.0)
-            if response.status_code == 200:
-                print("✅ AI Engine (Ollama): ONLINE & READY")
+        if settings.AI_PROVIDER == "gemini":
+            if settings.GEMINI_API_KEY:
+                print("✅ AI Engine (Gemini) is CONFIGURED and ONLINE!")
             else:
-                print(f"⚠️ AI Engine connected, but returned weird status: {response.status_code}")
-    except httpx.ConnectError:
-        print("❌ CRITICAL WARNING: AI Engine (Ollama) is OFFLINE!")
-        print("❌ Please open the Ollama app on your Windows desktop.")
+                print("❌ CRITICAL WARNING: Gemini API Key is missing in your .env file!")
+        else:
+            print(f"⚠️ Unknown AI Provider configured: {settings.AI_PROVIDER}")
     except Exception as e:
-        print(f"⚠️ AI Engine status unknown: {e}")
+        print(f"⚠️ AI Engine status check failed: {e}")
         
     print("="*40 + "\n")
     

@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Stethoscope, 
-  Search, 
-  Users, 
   LayoutDashboard, 
+  Users, 
   Calendar, 
   Pill, 
   Microscope, 
@@ -15,26 +14,96 @@ import {
   Settings, 
   LogOut,
   Bell,
-  ArrowRight
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  Activity
 } from 'lucide-react';
+import { signout } from './login/actions';
+import { useBackendStatus } from '@/components/BackendStatus';
 
-export default function SearchPage() {
-  const [searchId, setSearchId] = useState('');
+interface QueueItem {
+  id: number;
+  patient_name: string;
+  severity: number;
+  visit_date: string;
+  status: string;
+  is_red_flag: boolean;
+  created_at: string;
+}
+
+export default function DoctorDashboard() {
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
+  const { setUnreachable } = useBackendStatus();
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchId.trim()) {
-      // Support both "AE-00001" and just "1"
-      const numericId = searchId.replace(/AE-/i, '').replace(/^0+/, '');
-      router.push(`/patient/${numericId}`);
+  const fetchQueue = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8000/api/v1/patients/queue');
+      if (!response.ok) throw new Error('Failed to fetch triage queue');
+      const data = await response.json();
+      setQueue(data);
+      setUnreachable(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof Error && err.message === 'Failed to fetch') {
+        setUnreachable(true);
+      }
+    } finally {
+      setLoading(false);
     }
+  }, [setUnreachable]);
+
+  useEffect(() => {
+    fetchQueue();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchQueue, 30000);
+    return () => clearInterval(interval);
+  }, [fetchQueue]);
+
+  const stats = {
+    critical: queue.filter(p => p.severity === 5).length,
+    serious: queue.filter(p => p.severity === 3 || p.severity === 4).length,
+    routine: queue.filter(p => p.severity <= 2).length,
+  };
+
+  const filteredQueue = queue.filter(p => 
+    p.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.id.toString().includes(searchTerm)
+  );
+
+  const getSeverityStyles = (level: number) => {
+    if (level >= 5) return "bg-red-50 text-red-700 border-red-100";
+    if (level >= 3) return "bg-amber-50 text-amber-700 border-amber-100";
+    return "bg-emerald-50 text-emerald-700 border-emerald-100";
+  };
+
+  const getStatusBadge = (status: string) => {
+    if (status === "Completed") {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 uppercase">
+          <CheckCircle2 className="w-3 h-3" /> Validated
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">
+        <Clock className="w-3 h-3" /> Pending
+      </span>
+    );
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       
-      {/* Sidebar - Consistent with the rest of the app */}
+      {/* Left Sidebar */}
       <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
@@ -45,8 +114,8 @@ export default function SearchPage() {
         
         <nav className="flex-1 px-3 py-4 space-y-1">
           {[
-            { icon: LayoutDashboard, label: 'Overview' },
-            { icon: Users, label: 'Patients', active: true },
+            { icon: LayoutDashboard, label: 'Overview', active: true },
+            { icon: Users, label: 'Patients' },
             { icon: Calendar, label: 'Appointments' },
             { icon: Pill, label: 'Prescriptions' },
             { icon: Microscope, label: 'Investigations' },
@@ -65,7 +134,10 @@ export default function SearchPage() {
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors">
+          <button 
+            onClick={() => signout()}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+          >
             <LogOut className="w-4 h-4" />
             Logout
           </button>
@@ -73,12 +145,22 @@ export default function SearchPage() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 flex flex-col">
+      <main className="flex-1 ml-64 flex flex-col min-w-0">
+        
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-8 py-3.5 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-slate-800">Doctor Dashboard</h1>
+          <div>
+            <h1 className="text-lg font-bold text-slate-800">Triage Command Center</h1>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Hospital ID: Aegis-Main-01</p>
+          </div>
           
           <div className="flex items-center gap-5">
+            <button 
+              onClick={fetchQueue}
+              className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors group"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-500' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+            </button>
             <button className="relative p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white"></span>
@@ -96,50 +178,134 @@ export default function SearchPage() {
           </div>
         </header>
 
-        {/* Search Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <div className="max-w-2xl w-full space-y-12 text-center">
-            <div className="space-y-4">
-              <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200 rotate-3">
-                <Stethoscope className="text-white w-10 h-10" />
+        {/* Dashboard Content */}
+        <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
+          
+          {/* Severity Counters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border-l-4 border-l-red-500 rounded-xl shadow-sm p-6 border border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Critical (Level 5)</p>
+                <h3 className="text-3xl font-black text-slate-900">{stats.critical}</h3>
               </div>
-              <h2 className="text-4xl font-black text-slate-900 tracking-tight">Clinical Case Search</h2>
-              <p className="text-slate-500 text-lg font-medium">Access live triage assessments and medical records from the Aegis PostgreSQL engine.</p>
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center">
+                <AlertTriangle className="text-red-500 w-6 h-6" />
+              </div>
+            </div>
+            
+            <div className="bg-white border-l-4 border-l-amber-500 rounded-xl shadow-sm p-6 border border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Serious (Level 3-4)</p>
+                <h3 className="text-3xl font-black text-slate-900">{stats.serious}</h3>
+              </div>
+              <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center">
+                <Activity className="text-amber-500 w-6 h-6" />
+              </div>
             </div>
 
-            <form onSubmit={handleSearch} className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition-opacity"></div>
-              <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex p-2">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Enter Patient Case ID (e.g. 1, AE-00015)..."
-                    value={searchId}
-                    onChange={(e) => setSearchId(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 text-lg font-bold text-slate-800 placeholder:text-slate-300 outline-none"
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="bg-blue-600 text-white px-8 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100"
-                >
-                  Load Patient <ArrowRight className="w-5 h-5" />
-                </button>
+            <div className="bg-white border-l-4 border-l-emerald-500 rounded-xl shadow-sm p-6 border border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Routine (Level 1-2)</p>
+                <h3 className="text-3xl font-black text-slate-900">{stats.routine}</h3>
               </div>
-            </form>
+              <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="text-emerald-500 w-6 h-6" />
+              </div>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-3 gap-6 pt-12 border-t border-slate-100">
-              {[
-                { label: 'Live Database', value: 'Connected', color: 'text-emerald-500' },
-                { label: 'Active Triage', value: 'Ready', color: 'text-blue-500' },
-                { label: 'Security', value: 'HIPAA Compliant', color: 'text-slate-400' }
-              ].map((stat) => (
-                <div key={stat.label} className="text-center space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                  <p className={`text-sm font-bold ${stat.color}`}>{stat.value}</p>
-                </div>
-              ))}
+          {/* Queue Table Section */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Live Triage Queue</h2>
+                <p className="text-xs text-slate-500 font-medium">Prioritized by clinical severity index</p>
+              </div>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search by name or case ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                    <th className="py-4 px-6">Patient Name & ID</th>
+                    <th className="py-4 px-6">Severity Index</th>
+                    <th className="py-4 px-6">Time Submitted</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredQueue.length > 0 ? (
+                    filteredQueue.map((patient) => (
+                      <tr 
+                        key={patient.id}
+                        onClick={() => router.push(`/patient/${patient.id}`)}
+                        className="group hover:bg-slate-50/80 cursor-pointer transition-colors"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-sm border border-slate-200">
+                              {patient.patient_name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{patient.patient_name}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Case #AE-{patient.id.toString().padStart(5, '0')}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className={`w-fit px-3 py-1 rounded-full border text-xs font-bold flex items-center gap-1.5 ${getSeverityStyles(patient.severity)}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            Level {patient.severity}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <p className="text-xs font-medium text-slate-600">{patient.visit_date}</p>
+                          <p className="text-[10px] text-slate-400 font-medium">Wait time: ~12m</p>
+                        </td>
+                        <td className="py-4 px-6">
+                          {getStatusBadge(patient.status)}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex items-center justify-end gap-2 text-slate-300 group-hover:text-blue-500 transition-colors">
+                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">View Record</span>
+                            <ChevronRight className="w-5 h-5" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-20 text-center">
+                        <div className="max-w-xs mx-auto space-y-3">
+                          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                            <Users className="text-slate-200 w-8 h-8" />
+                          </div>
+                          <p className="text-slate-400 font-medium italic">No cases found in the triage queue.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Showing {filteredQueue.length} records in queue</p>
+              <div className="flex gap-2">
+                <button disabled className="px-3 py-1 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-400 cursor-not-allowed">Previous</button>
+                <button disabled className="px-3 py-1 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-400 cursor-not-allowed">Next</button>
+              </div>
             </div>
           </div>
         </div>

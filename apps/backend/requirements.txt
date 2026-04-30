@@ -1,4 +1,4 @@
-fastapi==0.104.1
+fastapi>=0.106.0
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic-settings==2.1.0
@@ -7,3 +7,4 @@ sqlalchemy[asyncio]==2.0.23
 asyncpg==0.29.0
 httpx==0.28.1
 ollama==0.6.1
+google-genai==1.74.0

@@ -8,7 +8,13 @@ dist/
 build/
 out/
 venv/
+apps/*/venv/
 .env*/
+
+# Lock files (pnpm monorepo - use pnpm-lock.yaml only)
+package-lock.json
+apps/*/package-lock.json
+yarn.lock
 
 # Secrets & Environment
 .env
@@ -30,6 +36,14 @@ cert.t7
 .classpath
 .settings/
 *.sublime-workspace
+*.sublime-project
+.DS_Store
+.prettierignore
+.editorconfig
+*.iml
+*.iws
+*.ipr
+local.properties
 
 # OS Files
 .DS_Store
@@ -53,3 +67,16 @@ __pycache__/
 *.py[cod]
 __pycache__/
 *.pyc
+*.egg-info/
+*.egg
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Next.js per-app
+apps/doctor-app/.next/
+apps/patient-app/.next/
+apps/docs/.next/
+apps/doctor-app/out/
+apps/patient-app/out/
+apps/docs/out/
