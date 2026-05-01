@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  /* Clinical Red Flag Colors */
+  --color-clinical-red: #dc2626;
+  --color-clinical-red-bg: #fef2f2;
+  --color-clinical-red-border: #fee2e2;
+
+  /* Serious Alert Colors */
+  --color-clinical-amber: #d97706;
+  --color-clinical-amber-bg: #fffbeb;
+  --color-clinical-amber-border: #fef3c7;
+
+  /* Success/Routine Colors */
+  --color-clinical-green: #059669;
+  --color-clinical-green-bg: #ecfdf5;
+  --color-clinical-green-border: #d1fae5;
+
+  /* Primary Branding */
+  --color-clinical-blue: #2563eb;
+  --color-clinical-blue-hover: #1d4ed8;
+  
+  /* Typography */
+  --font-clinical: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}

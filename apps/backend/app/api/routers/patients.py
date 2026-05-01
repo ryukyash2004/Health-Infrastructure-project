@@ -10,7 +10,8 @@ from app.schemas.patient import VisitPayload, PatientResponse, PatientQueueItem
 
 router = APIRouter()
 
-@router.get("/queue", response_model=List[PatientQueueItem])
+# FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
+@router.api_route("/queue", methods=["GET", "HEAD"], response_model=List[PatientQueueItem])
 async def get_patient_queue(
     skip: int = 0, 
     limit: int = 100, 
@@ -28,7 +29,8 @@ async def get_patient_queue(
     patients = result.scalars().all()
     return patients
 
-@router.get("/{patient_id}")
+# FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
+@router.api_route("/{patient_id}", methods=["GET", "HEAD"])
 async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
     """
     Retrieves actual patient data from the PostgreSQL database.

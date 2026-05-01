@@ -11,7 +11,6 @@ import {
   FileBarChart, 
   MessageSquare, 
   Settings, 
-  LogOut, 
   Bell, 
   Plus, 
   Trash2, 
@@ -22,14 +21,13 @@ import {
   History,
   ClipboardList,
   Activity,
-  Stethoscope,
   ChevronDown,
   ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { signout } from '../../login/actions';
 import { useBackendStatus } from '@/components/BackendStatus';
-import MedicalAutocomplete from '../../../components/MedicalAutocomplete';
+import { Sidebar, Header, MedicalAutocomplete, NavItem } from '@aegis/ui';
 
 // --- Types ---
 interface Medicine {

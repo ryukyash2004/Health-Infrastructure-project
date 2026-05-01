@@ -1,28 +1,62 @@
 "use client";
 
-import Header from "../components/Header";
 import ChatArea from "../components/ChatArea";
 import InputBar from "../components/InputBar";
 import Modals from "../components/Modals";
 import IntakeForm from "../components/IntakeForm";
 import { useStore } from "../store/useStore";
+import { Sidebar, Header as SharedHeader, NavItem } from '@aegis/ui';
+import { 
+  LayoutDashboard, 
+  MessageSquare, 
+  History, 
+  Settings, 
+  FileText
+} from 'lucide-react';
 
 export default function Home() {
   const { isIntakeComplete } = useStore();
 
-  return (
-    <main className="relative min-h-screen bg-white text-gray-900 font-sans selection:bg-gray-100 selection:text-gray-900 overflow-x-hidden">
-      <div className="max-w-4xl lg:max-w-5xl mx-auto flex flex-col min-h-screen shadow-xl shadow-slate-100/50">
-        <Header />
-        
-        <ChatArea />
-        
-        <InputBar />
-        
-        <Modals />
+  const navItems: NavItem[] = [
+    { icon: LayoutDashboard, label: 'Dashboard', active: true },
+    { icon: MessageSquare, label: 'AI Triage' },
+    { icon: History, label: 'My Cases' },
+    { icon: FileText, label: 'Records' },
+    { icon: Settings, label: 'Settings' },
+  ];
 
-        {!isIntakeComplete && <IntakeForm />}
-      </div>
+  return (
+    <main className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
+      {!isIntakeComplete ? (
+        <IntakeForm />
+      ) : (
+        <>
+          <Sidebar 
+            navItems={navItems} 
+            onLogout={() => window.location.reload()} 
+            onLogoClick={() => window.location.reload()}
+          />
+          
+          <div className="flex-1 ml-64 flex flex-col min-w-0 h-screen relative">
+            <SharedHeader 
+              title="Patient Portal"
+              subtitle="AI-Powered Clinical Triage"
+              user={{
+                name: "Guest Patient",
+                role: "Self-Triage Mode",
+                initials: "GP"
+              }}
+            />
+            
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <ChatArea />
+              <InputBar />
+            </div>
+
+            <Modals />
+          </div>
+        </>
+      )}
     </main>
   );
 }

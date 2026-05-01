@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Stethoscope, 
   LayoutDashboard, 
   Users, 
   Calendar, 
@@ -12,7 +11,6 @@ import {
   FileBarChart, 
   MessageSquare, 
   Settings, 
-  LogOut,
   Bell,
   AlertTriangle,
   Clock,
@@ -24,6 +22,7 @@ import {
 } from 'lucide-react';
 import { signout } from './login/actions';
 import { useBackendStatus } from '@/components/BackendStatus';
+import { Sidebar, Header, NavItem } from '@aegis/ui';
 
 interface QueueItem {
   id: number;
@@ -100,83 +99,42 @@ export default function DoctorDashboard() {
     );
   };
 
+  const navItems: NavItem[] = [
+    { icon: LayoutDashboard, label: 'Overview', active: true },
+    { icon: Users, label: 'Patients' },
+    { icon: Calendar, label: 'Appointments' },
+    { icon: Pill, label: 'Prescriptions' },
+    { icon: Microscope, label: 'Investigations' },
+    { icon: FileBarChart, label: 'Reports' },
+    { icon: MessageSquare, label: 'Messages' },
+    { icon: Settings, label: 'Settings' },
+  ];
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       
       {/* Left Sidebar */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <Stethoscope className="text-white w-5 h-5" />
-          </div>
-          <span className="text-white font-bold text-lg tracking-tight uppercase">Aegis Health</span>
-        </div>
-        
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {[
-            { icon: LayoutDashboard, label: 'Overview', active: true },
-            { icon: Users, label: 'Patients' },
-            { icon: Calendar, label: 'Appointments' },
-            { icon: Pill, label: 'Prescriptions' },
-            { icon: Microscope, label: 'Investigations' },
-            { icon: FileBarChart, label: 'Reports' },
-            { icon: MessageSquare, label: 'Messages' },
-            { icon: Settings, label: 'Settings' },
-          ].map((item) => (
-            <button 
-              key={item.label}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium transition-colors ${item.active ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-slate-100'}`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-800">
-          <button 
-            onClick={() => signout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
-        </div>
-      </aside>
+      <Sidebar 
+        navItems={navItems} 
+        onLogout={signout} 
+        onLogoClick={() => router.push('/')}
+      />
 
       {/* Main Content */}
       <main className="flex-1 ml-64 flex flex-col min-w-0">
         
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-8 py-3.5 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">Triage Command Center</h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Hospital ID: Aegis-Main-01</p>
-          </div>
-          
-          <div className="flex items-center gap-5">
-            <button 
-              onClick={fetchQueue}
-              className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors group"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-500' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-            </button>
-            <button className="relative p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white"></span>
-            </button>
-            <div className="h-6 w-px bg-slate-200"></div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-900">Dr. Sarah Connor</p>
-                <p className="text-[10px] text-slate-500 font-medium">MBBS, MD</p>
-              </div>
-              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold border border-slate-200">
-                SC
-              </div>
-            </div>
-          </div>
-        </header>
+        <Header 
+          title="Triage Command Center"
+          subtitle="Hospital ID: Aegis-Main-01"
+          user={{
+            name: "Dr. Sarah Connor",
+            role: "MBBS, MD",
+            initials: "SC"
+          }}
+          onRefresh={fetchQueue}
+          isLoading={loading}
+        />
 
         {/* Dashboard Content */}
         <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
