@@ -22,7 +22,9 @@ import {
   ClipboardList,
   Activity,
   ChevronDown,
-  ArrowLeft
+  ArrowLeft,
+  Stethoscope,
+  LogOut
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { signout } from '../../login/actions';

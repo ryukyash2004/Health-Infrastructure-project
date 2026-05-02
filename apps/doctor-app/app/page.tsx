@@ -39,6 +39,8 @@ export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('Overview');
   const router = useRouter();
   const { setUnreachable } = useBackendStatus();
 
@@ -100,30 +102,33 @@ export default function DoctorDashboard() {
   };
 
   const navItems: NavItem[] = [
-    { icon: LayoutDashboard, label: 'Overview', active: true },
-    { icon: Users, label: 'Patients' },
-    { icon: Calendar, label: 'Appointments' },
-    { icon: Pill, label: 'Prescriptions' },
-    { icon: Microscope, label: 'Investigations' },
-    { icon: FileBarChart, label: 'Reports' },
-    { icon: MessageSquare, label: 'Messages' },
-    { icon: Settings, label: 'Settings' },
+    { icon: LayoutDashboard, label: 'Overview', onClick: () => setActiveTab('Overview') },
+    { icon: Users, label: 'Patients', onClick: () => setActiveTab('Patients') },
+    { icon: Calendar, label: 'Appointments', onClick: () => setActiveTab('Appointments') },
+    { icon: Pill, label: 'Prescriptions', onClick: () => setActiveTab('Prescriptions') },
+    { icon: Microscope, label: 'Investigations', onClick: () => setActiveTab('Investigations') },
+    { icon: FileBarChart, label: 'Reports', onClick: () => setActiveTab('Reports') },
+    { icon: MessageSquare, label: 'Messages', onClick: () => setActiveTab('Messages') },
+    { icon: Settings, label: 'Settings', onClick: () => setActiveTab('Settings') },
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
+    <main className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       
-      {/* Left Sidebar */}
+      {/* Shared Sidebar */}
       <Sidebar 
         navItems={navItems} 
         onLogout={signout} 
         onLogoClick={() => router.push('/')}
+        activeItem={activeTab}
+        isMobileOpen={isSidebarOpen}
+        onMobileClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Main Content */}
-      <main className="flex-1 ml-64 flex flex-col min-w-0">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Header */}
+        {/* Shared Header */}
         <Header 
           title="Triage Command Center"
           subtitle="Hospital ID: Aegis-Main-01"
@@ -134,6 +139,7 @@ export default function DoctorDashboard() {
           }}
           onRefresh={fetchQueue}
           isLoading={loading}
+          onMenuClick={() => setIsSidebarOpen(true)}
         />
 
         {/* Dashboard Content */}
@@ -267,7 +273,7 @@ export default function DoctorDashboard() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
