@@ -11,7 +11,6 @@ import {
   FileBarChart, 
   MessageSquare, 
   Settings, 
-  Bell, 
   Plus, 
   Trash2, 
   AlertTriangle,
@@ -21,10 +20,7 @@ import {
   History,
   ClipboardList,
   Activity,
-  ChevronDown,
   ArrowLeft,
-  Stethoscope,
-  LogOut
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { signout } from '../../login/actions';
@@ -57,10 +53,10 @@ interface PatientData {
   id: string;
   db_id: number;
   name: string;
-  age: number;
-  gender: string;
-  blood_group: string;
-  contact: string;
+  age: number | null;
+  gender: string | null;
+  blood_group: string | null;
+  contact: string | null;
   visit_date: string;
   visit_type: string;
   status: string;
@@ -68,6 +64,31 @@ interface PatientData {
     patient_complaint: string;
     history_of_present_illness: string;
     past_history: string[];
+    skipped_intake_fields: string[];
+    conditions: {
+      hypertension?: boolean;
+      diabetes?: boolean;
+      asthma?: boolean;
+      thyroid?: boolean;
+    };
+    bad_habits: {
+      smoking?: boolean;
+      alcohol?: boolean;
+    };
+    allergies_data: {
+      drug?: boolean;
+      food?: boolean;
+      environment?: boolean;
+    };
+    allergy_reaction: string | null;
+    vaccinations: {
+      covid19?: boolean;
+      tetanus?: boolean;
+      hepatitisB?: boolean;
+    };
+    sleep_cycle: string | null;
+    bowel_movement: string | null;
+    other_history: string | null;
     doctor_notes?: string;
     ai_assessment: {
       severity_level: number;
@@ -81,6 +102,7 @@ export default function PatientDetail() {
   const id = params.id as string;
   const router = useRouter();
   const { setUnreachable } = useBackendStatus();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +122,77 @@ export default function PatientDetail() {
   const [differentials, setDifferentials] = useState<Differential[]>([
     { id: '1', diagnosis: 'Acute Gastritis', reason: 'Epigastric tenderness, relationship with spicy food', investigation: 'H. pylori Breath Test' }
   ]);
+  const navItems: NavItem[] = [
+    { icon: LayoutDashboard, label: 'Overview', onClick: () => router.push('/') },
+    { icon: Users, label: 'Patients', active: true },
+    { icon: Calendar, label: 'Appointments' },
+    { icon: Pill, label: 'Prescriptions' },
+    { icon: Microscope, label: 'Investigations' },
+    { icon: FileBarChart, label: 'Reports' },
+    { icon: MessageSquare, label: 'Messages' },
+    { icon: Settings, label: 'Settings' },
+  ];
+  const sidebarOffset = isSidebarOpen ? 'md:ml-[17rem]' : 'md:ml-20';
+  const footerOffset = isSidebarOpen ? 'md:left-[17rem]' : 'md:left-20';
+
+  const renderOptionalField = (value: string | null, options?: { placeholder?: string }) => {
+    if (!value) {
+      return (
+        <div className="w-full min-h-9 flex items-center">
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs italic text-slate-500">
+            Not provided
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <input
+        type="text"
+        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+        placeholder={options?.placeholder}
+        defaultValue={value}
+      />
+    );
+  };
+
+  const renderUnderlineOptionalField = (value: string | null) => {
+    if (!value) {
+      return (
+        <div className="w-full min-h-8 flex items-center">
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs italic text-slate-500">
+            Not provided
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <input
+        type="text"
+        className="w-full border-b border-slate-200 py-1 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors"
+        defaultValue={value}
+      />
+    );
+  };
+
+  const vaccinationRows = patient ? [
+    patient.clinical_data.vaccinations?.covid19 ? {
+      vaccine: 'COVID-19',
+      details: 'Recorded in patient intake form',
+      status: 'Recorded'
+    } : null,
+    patient.clinical_data.vaccinations?.tetanus ? {
+      vaccine: 'Tetanus',
+      details: 'Recorded in patient intake form',
+      status: 'Recorded'
+    } : null,
+    patient.clinical_data.vaccinations?.hepatitisB ? {
+      vaccine: 'Hepatitis B',
+      details: 'Recorded in patient intake form',
+      status: 'Recorded'
+    } : null
+  ].filter((row): row is { vaccine: string; details: string; status: string } => Boolean(row)) : [];
 
   const fetchPatientData = useCallback(async (patientId: string) => {
     try {
@@ -227,84 +320,34 @@ export default function PatientDetail() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
-      
-      {/* PART 1: THE SHELL - Left Sidebar Navigation (Flat) */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800 cursor-pointer" onClick={() => router.push('/')}>
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <Stethoscope className="text-white w-5 h-5" />
-          </div>
-          <span className="text-white font-bold text-lg tracking-tight uppercase">Aegis Health</span>
-        </div>
-        
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {[
-            { icon: LayoutDashboard, label: 'Overview' },
-            { icon: Users, label: 'Patients', active: true },
-            { icon: Calendar, label: 'Appointments' },
-            { icon: Pill, label: 'Prescriptions' },
-            { icon: Microscope, label: 'Investigations' },
-            { icon: FileBarChart, label: 'Reports' },
-            { icon: MessageSquare, label: 'Messages' },
-            { icon: Settings, label: 'Settings' },
-          ].map((item) => (
-            <button 
-              key={item.label}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium transition-colors ${item.active ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-slate-100'}`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-800">
-          <button 
-            onClick={() => signout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
-        </div>
-      </aside>
+    <div className="flex min-h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
+      <Sidebar
+        navItems={navItems}
+        onLogout={signout}
+        onLogoClick={() => router.push('/')}
+        activeItem="Patients"
+        isExpanded={isSidebarOpen}
+        isMobileOpen={isSidebarOpen}
+        onToggleExpand={() => setIsSidebarOpen((prev) => !prev)}
+        onMobileClose={() => setIsSidebarOpen(false)}
+      />
 
       {/* Main Content Wrapper */}
-      <main className="flex-1 ml-64 flex flex-col min-w-0">
-        
-        {/* PART 1: THE SHELL - Top Sticky Header (Flat) */}
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-8 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.push('/')}
-              className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-lg font-bold text-slate-800">Patient Medical Record</h1>
-          </div>
-          
-          <div className="flex items-center gap-5">
-            <button className="relative p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white"></span>
-            </button>
-            <div className="h-6 w-px bg-slate-200"></div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-900">Dr. Sarah Connor</p>
-                <p className="text-[10px] text-slate-500 font-medium">MBBS, MD</p>
-              </div>
-              <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold border border-slate-200">
-                SC
-              </div>
-            </div>
-          </div>
-        </header>
+      <main className={`flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ${sidebarOffset}`}>
+        <Header
+          title="Patient Medical Record"
+          subtitle="Clinical Review Workspace"
+          user={{
+            name: "Dr. Sarah Connor",
+            role: "MBBS, MD",
+            initials: "SC"
+          }}
+          onBack={() => router.push('/')}
+          onMenuClick={() => setIsSidebarOpen((prev) => !prev)}
+        />
 
         {/* Scrolling Area */}
-        <div className="p-8 space-y-6 pb-32 max-w-6xl mx-auto w-full">
+        <div className="w-full max-w-6xl mx-auto space-y-6 px-4 py-6 pb-32 md:px-6 xl:px-8">
           
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* PART 1: THE SHELL - Patient Context Bar (Flattened) */}
@@ -319,8 +362,8 @@ export default function PatientDetail() {
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200 font-medium uppercase tracking-wider">{patient.id}</span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-                    <span>{patient.age || '??'} Yrs / {patient.gender}</span>
-                    <span>{patient.contact}</span>
+                    <span>{patient.age ?? 'Not provided'}{patient.age !== null ? ' Yrs' : ''} / {patient.gender ?? 'Not provided'}</span>
+                    <span>{patient.contact ?? 'Not provided'}</span>
                     <span>Visit: {patient.visit_date}</span>
                     <span className="text-blue-600 font-bold">{patient.visit_type}</span>
                   </div>
@@ -390,20 +433,24 @@ export default function PatientDetail() {
                   <History className="w-4 h-4 text-blue-600" /> 3. Past History
                 </h4>
                 <div className="space-y-2.5">
-                  {['Hypertension', 'Diabetes Type 2', 'Chronic Migraine'].map(item => (
-                    <label key={item} className="flex items-center gap-3 text-sm font-medium text-slate-600 cursor-pointer">
+                  {[
+                    { label: 'Hypertension', checked: patient.clinical_data.conditions?.hypertension ?? false },
+                    { label: 'Diabetes Type 2', checked: patient.clinical_data.conditions?.diabetes ?? false },
+                    { label: 'Chronic Migraine', checked: patient.clinical_data.conditions?.thyroid ?? false }
+                  ].map((item) => (
+                    <label key={item.label} className="flex items-center gap-3 text-sm font-medium text-slate-600 cursor-pointer">
                       <input 
                         type="checkbox" 
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                        defaultChecked={patient.clinical_data.past_history.includes(item)}
+                        defaultChecked={item.checked}
                       />
-                      {item}
+                      {item.label}
                     </label>
                   ))}
                 </div>
                 <div className="pt-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Other Illnesses</label>
-                  <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-blue-500" defaultValue="Appendectomy (2018)" />
+                  {renderOptionalField(patient.clinical_data.other_history)}
                 </div>
               </div>
 
@@ -422,18 +469,21 @@ export default function PatientDetail() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {[
-                        { v: 'COVID-19 (Covishield)', d: '3rd Dose / 12-05-2022', s: 'Complete' },
-                        { v: 'Influenza (Annual)', d: 'Scheduled Oct 2024', s: 'Due Soon' }
-                      ].map((row, i) => (
-                        <tr key={i}>
-                          <td className="py-3 px-4 font-medium">{row.v}</td>
-                          <td className="py-3 px-4 text-slate-500">{row.d}</td>
+                      {vaccinationRows.length > 0 ? vaccinationRows.map((row) => (
+                        <tr key={row.vaccine}>
+                          <td className="py-3 px-4 font-medium">{row.vaccine}</td>
+                          <td className="py-3 px-4 text-slate-500">{row.details}</td>
                           <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.s === 'Complete' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{row.s}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">{row.status}</span>
                           </td>
                         </tr>
-                      ))}
+                      )) : (
+                        <tr>
+                          <td colSpan={3} className="py-6 px-4 text-center text-slate-400 italic">
+                            No vaccination data provided
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -448,8 +498,8 @@ export default function PatientDetail() {
                   {[
                     { l: 'Appearance', v: 'Conscious, Oriented, No Pallor' },
                     { l: 'Appetite', v: 'Poor (Reduced)' },
-                    { l: 'Sleep Cycle', v: 'Disturbed due to acidity' },
-                    { l: 'Bowel Movement', v: 'Regular, No constipation' },
+                    { l: 'Sleep Cycle', v: patient.clinical_data.sleep_cycle || '' },
+                    { l: 'Bowel Movement', v: patient.clinical_data.bowel_movement || '' },
                     { l: 'Urine', v: 'Normal frequency' },
                     { l: 'Perspiration', v: 'Normal' },
                     { l: 'Bad Habits', v: 'No Smoking, Occasional Alcohol' },
@@ -457,7 +507,9 @@ export default function PatientDetail() {
                   ].map((item) => (
                     <div key={item.l} className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.l}</label>
-                      <input type="text" className="w-full border-b border-slate-200 py-1 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors" defaultValue={item.v} />
+                      {item.l === 'Sleep Cycle' || item.l === 'Bowel Movement'
+                        ? renderUnderlineOptionalField(item.v || null)
+                        : <input type="text" className="w-full border-b border-slate-200 py-1 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors" defaultValue={item.v} />}
                     </div>
                   ))}
                 </div>
@@ -470,15 +522,21 @@ export default function PatientDetail() {
                 </h4>
                 <div className="flex flex-wrap gap-8">
                   <div className="flex gap-4">
-                    {['Peanuts', 'Penicillin', 'Latex'].map(item => (
-                      <label key={item} className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-red-500 focus:ring-red-500" />
-                        {item}
+                    {[
+                      { label: 'Peanuts', checked: patient.clinical_data.allergies_data?.food ?? false },
+                      { label: 'Penicillin', checked: patient.clinical_data.allergies_data?.drug ?? false },
+                      { label: 'Latex', checked: patient.clinical_data.allergies_data?.environment ?? false }
+                    ].map((item) => (
+                      <label key={item.label} className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-red-500 focus:ring-red-500" defaultChecked={item.checked} />
+                        {item.label}
                       </label>
                     ))}
                   </div>
                   <div className="flex-1 min-w-[300px]">
-                    <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-blue-500" placeholder="Describe specific reactions or other allergies..." defaultValue="Mild skin rash reported with Ibuprofen in the past." />
+                    {renderOptionalField(patient.clinical_data.allergy_reaction, {
+                      placeholder: "Describe specific reactions or other allergies..."
+                    })}
                   </div>
                 </div>
               </div>
@@ -696,8 +754,8 @@ export default function PatientDetail() {
 
         {/* PART 4: BOTTOM ACTION BAR (Flat) */}
         {patient && (
-          <footer className="fixed bottom-0 right-0 left-64 bg-white/90 backdrop-blur border-t border-slate-200 p-6 z-40">
-            <div className="max-w-6xl mx-auto flex items-center justify-end gap-4">
+          <footer className={`fixed bottom-0 right-0 z-40 border-t border-slate-200 bg-white/90 p-4 backdrop-blur transition-[left] duration-300 ${footerOffset} left-0 md:p-6`}>
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-3 md:gap-4">
               <button 
                 className="px-6 py-2.5 border border-slate-200 text-slate-500 rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all"
                 disabled={saving}

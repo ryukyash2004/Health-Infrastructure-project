@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Mic, SendHorizontal, X, Image as ImageIcon } from "lucide-react";
+import { Plus, Mic, SendHorizontal, X } from "lucide-react";
 import { useState, KeyboardEvent, useRef, useEffect } from "react";
 import { useStore } from "../store/useStore";
 

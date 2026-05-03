@@ -5,12 +5,46 @@ interface Message {
   content: string;
 }
 
+interface StructuredProfile {
+  patient_name: string;
+  age: number | null;
+  gender: string | null;
+  blood_group: string | null;
+  contact: string | null;
+  skipped_fields: string[];
+  conditions: {
+    hypertension: boolean;
+    diabetes: boolean;
+    asthma: boolean;
+    thyroid: boolean;
+  };
+  other_history: string | null;
+  sleep_cycle: string | null;
+  bad_habits: {
+    smoking: boolean;
+    alcohol: boolean;
+  };
+  bowel_movement: string | null;
+  allergies: {
+    drug: boolean;
+    food: boolean;
+    environment: boolean;
+  };
+  allergy_reaction: string | null;
+  vaccinations: {
+    covid19: boolean;
+    tetanus: boolean;
+    hepatitisB: boolean;
+  };
+}
+
 interface UIState {
   isLeftMenuOpen: boolean;
   isMedicalFormOpen: boolean;
   isSosOpen: boolean;
   isIntakeComplete: boolean;
   patientHistory: string;
+  structuredProfile: StructuredProfile | null;
   messages: Message[];
   isLoading: boolean;
   caseId: number | null;
@@ -20,6 +54,7 @@ interface UIState {
   toggleSos: () => void;
   setIntakeComplete: (complete: boolean) => void;
   setPatientHistory: (history: string) => void;
+  setStructuredProfile: (profile: StructuredProfile) => void;
   closeAll: () => void;
   
   sendMessage: (text: string) => Promise<void>;
@@ -41,6 +76,7 @@ export const useStore = create<UIState>((set, get) => {
     isSosOpen: false,
     isIntakeComplete: false,
     patientHistory: '',
+    structuredProfile: null,
     messages: [],
     isLoading: false,
     caseId: initialCaseId,
@@ -51,12 +87,13 @@ export const useStore = create<UIState>((set, get) => {
     toggleSos: () => set((state) => ({ isSosOpen: !state.isSosOpen })),
     setIntakeComplete: (complete) => set({ isIntakeComplete: complete }),
     setPatientHistory: (history) => set({ patientHistory: history }),
+    setStructuredProfile: (profile) => set({ structuredProfile: profile }),
     closeAll: () => set({ isLeftMenuOpen: false, isMedicalFormOpen: false, isSosOpen: false }),
 
     sendMessage: async (text: string) => {
       if (!text.trim()) return;
 
-      const { patientHistory } = get();
+      const { patientHistory, structuredProfile, caseId } = get();
 
       // Append user message
       const userMessage: Message = { role: 'user', content: text };
@@ -66,9 +103,15 @@ export const useStore = create<UIState>((set, get) => {
         error: null
       }));
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutError = new DOMException(
+          'Request timeout: triage service took longer than 15 seconds.',
+          'AbortError'
+        );
+        timeoutId = setTimeout(() => controller.abort(timeoutError), 15000);
 
         const response = await fetch('http://localhost:8000/api/v1/triage/', {
           method: 'POST',
@@ -78,14 +121,26 @@ export const useStore = create<UIState>((set, get) => {
             'X-User-ID': 'user_123'
           },
           body: JSON.stringify({
-            patient_name: 'Patient', 
+            patient_id: caseId,
+            patient_name: structuredProfile?.patient_name || 'Patient', 
             symptoms: text,
-            patient_history: patientHistory || "No history provided."
+            patient_history: patientHistory || "No history provided.",
+            skipped_fields: structuredProfile?.skipped_fields ?? [],
+            age: structuredProfile?.age ?? null,
+            gender: structuredProfile?.gender ?? null,
+            blood_group: structuredProfile?.blood_group ?? null,
+            contact: structuredProfile?.contact ?? null,
+            conditions: structuredProfile?.conditions ?? null,
+            other_history: structuredProfile?.other_history ?? null,
+            sleep_cycle: structuredProfile?.sleep_cycle ?? null,
+            bad_habits: structuredProfile?.bad_habits ?? null,
+            bowel_movement: structuredProfile?.bowel_movement ?? null,
+            allergies: structuredProfile?.allergies ?? null,
+            allergy_reaction: structuredProfile?.allergy_reaction ?? null,
+            vaccinations: structuredProfile?.vaccinations ?? null
           }),
           signal: controller.signal
         });
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -118,11 +173,11 @@ export const useStore = create<UIState>((set, get) => {
         
         let errorObj = { type: 'UNKNOWN' as const, message: 'An unexpected error occurred.' };
         
-        if (err.name === 'AbortError') {
+        if (err?.name === 'AbortError') {
           errorObj = { type: 'TIMEOUT', message: 'Request Timeout: The server is taking too long to respond.' };
-        } else if (err.type === 'AI') {
+        } else if (err?.type === 'AI') {
           errorObj = err;
-        } else if (err.message === 'Failed to fetch') {
+        } else if (err?.message === 'Failed to fetch') {
           errorObj = { type: 'NETWORK', message: 'Server Offline: Cannot connect to the Aegis backend.' };
         }
 
@@ -130,6 +185,9 @@ export const useStore = create<UIState>((set, get) => {
           isLoading: false,
           error: errorObj
         });
+      } finally {
+        // Always clear the timer so a completed request cannot be aborted later.
+        if (timeoutId) clearTimeout(timeoutId);
       }
     },
 
@@ -153,9 +211,10 @@ export const useStore = create<UIState>((set, get) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            patient_name: data.patientName || 'Guest Patient',
-            baseline_history: data.medicalHistory || 'None',
-            lethal_allergies: data.allergies || 'None'
+            patient_name: data.patient_name,
+            baseline_history: data.baseline_history,
+            lethal_allergies: data.lethal_allergies,
+            skipped_fields: data.skipped_fields
           }),
         });
 

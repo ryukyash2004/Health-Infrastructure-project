@@ -1,33 +1,48 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
 
 from app.core.database import get_db
 from app.models.patient import Patient, Prescription, FollowUp
-from app.schemas.patient import VisitPayload, PatientResponse, PatientQueueItem
+from app.schemas.patient import VisitPayload, PatientResponse, PatientQueueItem, PaginatedPatientQueue
 
 router = APIRouter()
 
+
+def optional_text(value: str | None) -> str | None:
+    cleaned = value.strip() if isinstance(value, str) else value
+    return cleaned if cleaned else None
+
 # FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
-@router.api_route("/queue", methods=["GET", "HEAD"], response_model=List[PatientQueueItem])
+@router.api_route("/queue", methods=["GET", "HEAD"], response_model=PaginatedPatientQueue)
 async def get_patient_queue(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 10, 
     db: AsyncSession = Depends(get_db)
 ):
     """
     Retrieves the triage queue sorted by severity (DESC) and wait time (ASC).
+    Now with pagination support.
     """
+    # Get total count
+    count_result = await db.execute(select(func.count(Patient.id)))
+    total_count = count_result.scalar_one()
+
+    # Get paginated items
     result = await db.execute(
         select(Patient)
-        .order_by(Patient.severity.desc(), Patient.created_at.asc())
+        .order_by(Patient.severity.desc(), Patient.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
     patients = result.scalars().all()
-    return patients
+    
+    return {
+        "items": patients,
+        "total_count": total_count
+    }
 
 # FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
 @router.api_route("/{patient_id}", methods=["GET", "HEAD"])
@@ -52,10 +67,10 @@ async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
             "id": f"AE-{patient.id:05d}", # Formatting for display consistency
             "db_id": patient.id,
             "name": patient.patient_name,
-            "age": patient.age or 0,
-            "gender": patient.gender or "Unknown",
-            "blood_group": patient.blood_group or "Not Specified",
-            "contact": patient.contact or "N/A",
+            "age": patient.age,
+            "gender": optional_text(patient.gender),
+            "blood_group": optional_text(patient.blood_group),
+            "contact": optional_text(patient.contact),
             "visit_date": patient.visit_date or patient.created_at.strftime("%d %b %Y, %I:%M %p"),
             "visit_type": patient.visit_type or ("EMERGENCY" if patient.is_red_flag else "OPD"),
             "status": patient.status,
@@ -63,11 +78,20 @@ async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
                 "patient_complaint": patient.symptoms,
                 "history_of_present_illness": patient.patient_history,
                 "past_history": [], # Placeholder
+                "skipped_intake_fields": patient.skipped_intake_fields or [],
+                "conditions": patient.conditions or {},
+                "bad_habits": patient.bad_habits or {},
+                "allergies_data": patient.allergies or {},
+                "allergy_reaction": optional_text(patient.allergy_reaction),
+                "vaccinations": patient.vaccinations or {},
+                "sleep_cycle": optional_text(patient.sleep_cycle),
+                "bowel_movement": optional_text(patient.bowel_movement),
+                "other_history": optional_text(patient.other_history),
                 "ai_assessment": {
                     "severity_level": patient.severity,
                     "differential_diagnosis": patient.differential_diagnosis or []
                 },
-                "doctor_notes": patient.doctor_notes,
+                "doctor_notes": optional_text(patient.doctor_notes),
                 "prescriptions": [
                     {
                         "medication": p.medication,

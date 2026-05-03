@@ -14,7 +14,7 @@ export default function ChatArea() {
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-20 min-h-screen">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-12 md:py-20">
         <h1 className="text-2xl font-semibold text-gray-800 mb-8 text-center transition-all duration-500 animate-in fade-in slide-in-from-bottom-4">
           Hi, what can I help you with?
         </h1>
@@ -35,7 +35,7 @@ export default function ChatArea() {
   }
 
   return (
-    <div className="flex-1 w-full flex flex-col pt-20 pb-24 px-4 gap-6 overflow-y-auto">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-y-auto px-4 pb-24 pt-8 md:pt-12">
       {messages.map((msg, index) => (
         <div 
           key={index} 

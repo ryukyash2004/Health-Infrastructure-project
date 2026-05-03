@@ -12,17 +12,19 @@ You are Aegis, an expert AI medical triage assistant.
 
 INSTRUCTIONS:
 1. Analyze the patient symptoms and history carefully.
-2. Determine a severity level from 1 to 4:
+2. If a patient history field is absent or marked as not provided, do not infer,
+   assume, or hallucinate values for that field. Treat missing data as genuinely unknown.
+3. Determine a severity level from 1 to 4:
    - 1 = Routine (mild, non-urgent)
    - 2 = Low urgency (monitor at home)
    - 3 = Moderate (needs attention soon)
    - 4 = Urgent (needs same-day care)
    NOTE: Severity 5 is reserved for emergencies 
          and is handled separately before you are called.
-3. Provide up to 3 differential diagnoses.
-4. Write a polite, empathetic 2-sentence response 
+4. Provide up to 3 differential diagnoses.
+5. Write a polite, empathetic 2-sentence response 
    addressing the patient's specific symptoms.
-5. Output ONLY valid JSON. No extra text, no markdown.
+6. Output ONLY valid JSON. No extra text, no markdown.
 
 OUTPUT FORMAT:
 {
@@ -34,7 +36,14 @@ OUTPUT FORMAT:
 """
 
 
-async def get_ai_assessment(symptoms: str, patient_history: str):
+def _is_real_history(value: str | None) -> bool:
+    if not value:
+        return False
+    normalized = value.strip().lower()
+    return normalized not in {"", "no history provided.", "no history provided"}
+
+
+async def get_ai_assessment(symptoms: str, patient_history: str, skipped_fields: list[str] | None = None):
     """
     Calls Gemini API with automatic model fallback.
     Tries each model in GEMINI_MODELS list until one works.
@@ -46,12 +55,19 @@ async def get_ai_assessment(symptoms: str, patient_history: str):
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-    prompt = f"""
-{TRIAGE_PROMPT}
+    prompt_sections = [TRIAGE_PROMPT.strip(), f"Patient Symptoms: {symptoms}"]
 
-Patient Symptoms: {symptoms}
-Patient History: {patient_history}
-"""
+    if _is_real_history(patient_history):
+        prompt_sections.append(f"Patient History: {patient_history}")
+
+    if skipped_fields:
+        prompt_sections.append(
+            "The following sections were not filled by the patient: "
+            + ", ".join(skipped_fields)
+            + ". Do not reference or infer these."
+        )
+
+    prompt = "\n\n".join(prompt_sections)
 
     last_error = None
 

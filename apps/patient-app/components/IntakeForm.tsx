@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore';
 import { ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 
 export default function IntakeForm() {
-  const { setPatientHistory, setIntakeComplete } = useStore();
+  const { setPatientHistory, setStructuredProfile, setIntakeComplete, submitMedicalProfile } = useStore();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     // Step 1
@@ -46,48 +46,140 @@ export default function IntakeForm() {
   const nextStep = () => setStep(step + 1);
   const prevStep = () => setStep(step - 1);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const PLACEHOLDERS = ['None', 'Not provided', 'N/A', 'Select', '', 'Unknown'];
+
+  const isValued = (val: any) => {
+    if (val === null || val === undefined) return false;
+    const str = String(val).trim();
+    return str !== '' && !PLACEHOLDERS.some(p => p.toLowerCase() === str.toLowerCase());
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Compile data into a formatted string
-    const historyParts = [];
-    historyParts.push(`Name: ${formData.fullName}`);
-    historyParts.push(`Age: ${formData.age}`);
-    historyParts.push(`Gender: ${formData.gender}`);
-    historyParts.push(`Blood Group: ${formData.bloodGroup}`);
-    
-    const conditions = Object.entries(formData.conditions)
+    const historyParts: string[] = [];
+    const skippedFields: string[] = [];
+    const structuredProfile = {
+      patient_name: formData.fullName,
+      age: parseInt(formData.age, 10) || null,
+      gender: formData.gender || null,
+      blood_group: formData.bloodGroup || null,
+      contact: formData.contactNumber || null,
+      skipped_fields: skippedFields,
+      conditions: {
+        hypertension: formData.conditions.hypertension,
+        diabetes: formData.conditions.diabetes,
+        asthma: formData.conditions.asthma,
+        thyroid: formData.conditions.thyroid
+      },
+      other_history: formData.otherHistory || null,
+      sleep_cycle: formData.sleepCycle || null,
+      bad_habits: {
+        smoking: formData.badHabits.smoking,
+        alcohol: formData.badHabits.alcohol
+      },
+      bowel_movement: formData.bowelMovement || null,
+      allergies: {
+        drug: formData.allergies.drug,
+        food: formData.allergies.food,
+        environment: formData.allergies.environment
+      },
+      allergy_reaction: formData.allergyReaction || null,
+      vaccinations: {
+        covid19: formData.vaccinations.covid19,
+        tetanus: formData.vaccinations.tetanus,
+        hepatitisB: formData.vaccinations.hepatitisB
+      }
+    };
+
+    // --- Serialization Logic with Hallucination Prevention ---
+
+    // Step 1: Demographics
+    if (isValued(formData.fullName)) historyParts.push(`Name: ${formData.fullName}`);
+    else skippedFields.push('Full Name');
+
+    if (isValued(formData.age)) historyParts.push(`Age: ${formData.age}`);
+    else skippedFields.push('Age');
+
+    if (isValued(formData.gender)) historyParts.push(`Gender: ${formData.gender}`);
+    else skippedFields.push('Gender');
+
+    if (isValued(formData.bloodGroup)) historyParts.push(`Blood Group: ${formData.bloodGroup}`);
+    else skippedFields.push('Blood Group');
+
+    if (isValued(formData.contactNumber)) historyParts.push(`Contact: ${formData.contactNumber}`);
+    else skippedFields.push('Contact Number');
+
+    // Step 2: Medical History
+    const activeConditions = Object.entries(formData.conditions)
       .filter(([_, value]) => value)
-      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
-      .join(', ');
-    if (conditions) historyParts.push(`Conditions: ${conditions}`);
-    if (formData.otherHistory) historyParts.push(`Other History: ${formData.otherHistory}`);
+      .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
     
-    historyParts.push(`Sleep: ${formData.sleepCycle}`);
-    
-    const habits = Object.entries(formData.badHabits)
+    if (activeConditions.length > 0) {
+      historyParts.push(`Existing Conditions: ${activeConditions.join(', ')}`);
+    } else {
+      skippedFields.push('Pre-existing Conditions');
+    }
+
+    if (isValued(formData.otherHistory)) {
+      historyParts.push(`Other History/Medications: ${formData.otherHistory}`);
+    } else {
+      skippedFields.push('Other Medical History');
+    }
+
+    // Step 3: Lifestyle
+    if (isValued(formData.sleepCycle)) historyParts.push(`Sleep Cycle: ${formData.sleepCycle}`);
+    else skippedFields.push('Sleep Duration');
+
+    const activeHabits = Object.entries(formData.badHabits)
       .filter(([_, value]) => value)
-      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
-      .join(', ');
-    if (habits) historyParts.push(`Habits: ${habits}`);
+      .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
     
-    historyParts.push(`Bowel: ${formData.bowelMovement}`);
-    
-    const allergies = Object.entries(formData.allergies)
+    if (activeHabits.length > 0) {
+      historyParts.push(`Habits: ${activeHabits.join(', ')}`);
+    } else {
+      skippedFields.push('Lifestyle Habits');
+    }
+
+    if (isValued(formData.bowelMovement)) historyParts.push(`Bowel Movement: ${formData.bowelMovement}`);
+    else skippedFields.push('Bowel Activity');
+
+    // Step 4: Safety
+    const activeAllergies = Object.entries(formData.allergies)
       .filter(([_, value]) => value)
-      .map(([key, _]) => key.charAt(0).toUpperCase() + key.slice(1))
-      .join(', ');
-    if (allergies) historyParts.push(`Allergies: ${allergies} (${formData.allergyReaction})`);
+      .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
     
-    const vaccines = Object.entries(formData.vaccinations)
+    if (activeAllergies.length > 0) {
+      const allergyInfo = `Allergies: ${activeAllergies.join(', ')}${isValued(formData.allergyReaction) ? ` (${formData.allergyReaction})` : ''}`;
+      historyParts.push(allergyInfo);
+    } else {
+      skippedFields.push('Allergies');
+    }
+
+    const activeVaccines = Object.entries(formData.vaccinations)
       .filter(([_, value]) => value)
-      .map(([key, _]) => key === 'covid19' ? 'COVID-19' : key.charAt(0).toUpperCase() + key.slice(1))
-      .join(', ');
-    if (vaccines) historyParts.push(`Vaccines: ${vaccines}`);
+      .map(([key]) => key === 'covid19' ? 'COVID-19' : key.charAt(0).toUpperCase() + key.slice(1));
+    
+    if (activeVaccines.length > 0) {
+      historyParts.push(`Recent Vaccinations: ${activeVaccines.join(', ')}`);
+    } else {
+      skippedFields.push('Vaccination History');
+    }
 
     const finalHistoryString = historyParts.join(' | ');
+    
+    // Update store state for immediate UI feedback
     setPatientHistory(finalHistoryString);
+    setStructuredProfile(structuredProfile);
     setIntakeComplete(true);
+
+    // Final form submission to backend
+    await submitMedicalProfile({
+      patient_name: formData.fullName || 'Guest Patient',
+      baseline_history: finalHistoryString,
+      lethal_allergies: activeAllergies.join(', ') || 'None reported',
+      skipped_fields: skippedFields
+    });
   };
 
   const progress = (step / 4) * 100;
@@ -95,9 +187,17 @@ export default function IntakeForm() {
   return (
     <div className="fixed inset-0 bg-white z-[60] flex flex-col md:max-w-4xl lg:max-w-5xl md:mx-auto md:shadow-2xl overflow-hidden md:my-10 md:rounded-3xl">
       {/* Progress Header */}
-      <div className="p-6 border-b border-slate-100">
+      <div className="p-6 pt-[max(1.5rem,env(safe-area-inset-top))] border-b border-slate-100">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-slate-800">Pre-Consultation</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-800">Pre-Consultation</h2>
+            <a 
+              href="tel:112"
+              className="bg-clinical-red text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-red-200"
+            >
+              SOS 112
+            </a>
+          </div>
           <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Step {step} of 4</span>
         </div>
         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">

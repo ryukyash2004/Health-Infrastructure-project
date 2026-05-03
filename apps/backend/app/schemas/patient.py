@@ -55,3 +55,8 @@ class PatientProfile(BaseModel):
     patient_name: str
     baseline_history: str
     lethal_allergies: str
+    skipped_fields: Optional[List[str]] = None
+
+class PaginatedPatientQueue(BaseModel):
+    items: List[PatientQueueItem]
+    total_count: int
