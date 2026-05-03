@@ -5,7 +5,6 @@ import {
   Stethoscope, 
   LogOut,
   LucideIcon,
-  Menu,
   X
 } from 'lucide-react';
 
@@ -75,15 +74,14 @@ export function Sidebar({
             )}
           </button>
 
-          {(onToggleExpand || onMobileClose) && (
+          {onMobileClose && (
             <button
               type="button"
-              aria-label={isMobileOpen ? 'Close menu' : 'Toggle sidebar'}
-              onClick={isMobileOpen ? onMobileClose : onToggleExpand}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+              aria-label="Close menu"
+              onClick={onMobileClose}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-800 hover:text-white md:hidden"
             >
-              <X className="h-4 w-4 md:hidden" />
-              <Menu className="hidden h-4 w-4 md:block" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>

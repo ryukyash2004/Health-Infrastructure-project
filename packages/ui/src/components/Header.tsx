@@ -66,10 +66,11 @@ export function Header({
         {emergencyCallHref && (
           <a
             href={emergencyCallHref}
-            className="hidden items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-100 sm:flex"
+            className="flex items-center gap-2 rounded-full bg-red-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-100 md:px-3"
           >
             <Phone className="w-3.5 h-3.5" />
-            {emergencyCallLabel}
+            <span className="hidden sm:inline">{emergencyCallLabel}</span>
+            <span className="sm:hidden">112</span>
           </a>
         )}
         {onRefresh && (
