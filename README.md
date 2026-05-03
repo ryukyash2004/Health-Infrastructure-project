@@ -19,8 +19,71 @@ Project Aegis is a healthcare triage monorepo with:
 - Node.js 18+
 - `pnpm`
 - Python 3.12 recommended
-- PostgreSQL running locally
+- PostgreSQL running locally, or Docker Desktop
 - WSL for backend development
+
+## Docker Database Setup
+
+If you do not already have PostgreSQL installed locally, you can run it with Docker.
+
+### Option A: `docker run`
+
+```powershell
+docker run --name aegis-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=aegis `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+To stop and start it later:
+
+```powershell
+docker stop aegis-postgres
+docker start aegis-postgres
+```
+
+To remove it completely:
+
+```powershell
+docker rm -f aegis-postgres
+```
+
+### Option B: `docker-compose.yml`
+
+If you prefer Compose, create a `docker-compose.yml` in the repo root:
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    container_name: aegis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - aegis_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  aegis_postgres_data:
+```
+
+Then run:
+
+```powershell
+docker compose up -d
+```
+
+The backend `.env` in this repo already matches that default setup:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/aegis
+```
 
 ## Backend Environment
 
@@ -32,7 +95,7 @@ GEMINI_API_KEY=your_key_here
 AI_PROVIDER=gemini
 ```
 
-Update the values to match your local PostgreSQL and Gemini setup.
+Update the values to match your local PostgreSQL and Gemini setup if you are not using the Docker defaults above.
 
 ## Install
 
@@ -64,6 +127,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 Notes:
 
+- Make sure PostgreSQL is already running first, either locally or in Docker.
 - `reset_db.py` drops and recreates backend tables.
 - Run it on first setup and any time the SQLAlchemy schema changes.
 - It deletes existing backend table data.
@@ -133,6 +197,12 @@ Backend schema reset:
 cd /mnt/e/code/Health\ Infrastructure\ project/apps/backend
 source venv/bin/activate
 python reset_db.py
+```
+
+Docker database logs:
+
+```powershell
+docker logs aegis-postgres
 ```
 
 ## Important Notes
