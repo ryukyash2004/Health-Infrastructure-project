@@ -1,10 +1,11 @@
 import json
 import traceback
+import asyncio
 from app.core.config import settings
 
 # Models tried in order — if first fails, tries next
 GEMINI_MODELS = [
-    "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5", "gemini-2.0-flash", "gemini-2.0-pro", "gemini-2.0"
+    "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"
 ]
 
 TRIAGE_PROMPT = """
@@ -75,13 +76,18 @@ async def get_ai_assessment(symptoms: str, patient_history: str, skipped_fields:
         try:
             print(f"DEBUG: Trying model {model}...")
 
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                )
+            # Run blocking SDK call in a separate thread with a 4-second timeout
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.models.generate_content,
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1,
+                    )
+                ),
+                timeout=4.0
             )
 
             text = response.text
@@ -101,6 +107,11 @@ async def get_ai_assessment(symptoms: str, patient_history: str, skipped_fields:
             diff_dx = ai_data.get("differential_diagnosis", [])
 
             return assessment, severity, diff_dx
+
+        except asyncio.TimeoutError as e:
+            print(f"⚠️  Model {model} timed out (4s limit reached), trying next...")
+            last_error = e
+            continue
 
         except ServerError as e:
             # 503 overloaded — try next model

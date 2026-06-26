@@ -58,18 +58,38 @@ def normalize_text(text: str) -> str:
     
     return text
 
+NEGATION_WORDS = {
+    "no", "not", "without", "never", "free", "absence", "didnt", "dont", "cant",
+    "wasnt", "arent", "isnt", "clear", "denies", "denied", "negative", "none"
+}
+
 def evaluate_red_flags(text: str) -> bool:
     """
     Deterministic Red Flag Interceptor.
     Scans input text for life-threatening symptoms before AI processing.
-    Now with improved case-insensitive, punctuation-resilient matching.
+    Utilizes a word-level search with prefix negation checking to prevent false positives.
     """
+    if not text:
+        return False
+        
     normalized_input = normalize_text(text)
+    input_words = normalized_input.split()
     
-    # Normalize keywords as well to ensure parity
     for keyword in CRITICAL_KEYWORDS:
-        normalized_keyword = normalize_text(keyword)
-        if normalized_keyword in normalized_input:
-            return True
+        kw_words = normalize_text(keyword).split()
+        if not kw_words:
+            continue
             
+        # Search for kw_words as a consecutive sublist in input_words
+        len_kw = len(kw_words)
+        for i in range(len(input_words) - len_kw + 1):
+            if input_words[i : i + len_kw] == kw_words:
+                # Check for negation words in the preceding 3-word window
+                prefix_start = max(0, i - 3)
+                prefix_words = input_words[prefix_start : i]
+                
+                is_negated = any(neg in prefix_words for neg in NEGATION_WORDS)
+                if not is_negated:
+                    return True  # Found a valid, non-negated red flag
+                    
     return False

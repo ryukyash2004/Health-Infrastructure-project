@@ -1,12 +1,14 @@
 from sqlalchemy import Column, String, Text, Integer, Boolean, DateTime, func, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+import uuid
 from app.core.database import Base
 
 class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
     patient_name = Column(String(255))
     age = Column(Integer)
     gender = Column(String(50))
@@ -21,20 +23,21 @@ class Patient(Base):
     allergies = Column(JSONB, nullable=True, default=None)
     allergy_reaction = Column(Text, nullable=True)
     vaccinations = Column(JSONB, nullable=True, default=None)
-    visit_date = Column(String(100))
-    visit_type = Column(String(50))
-    symptoms = Column(Text)
-    patient_history = Column(Text)
-    assessment = Column(Text)
-    severity = Column(Integer)
+    visit_date = Column(String(100), nullable=True)
+    visit_type = Column(String(50), nullable=True)
+    symptoms = Column(Text, nullable=True)
+    patient_history = Column(Text, nullable=True)
+    assessment = Column(Text, nullable=True)
+    severity = Column(Integer, nullable=True)
     is_red_flag = Column(Boolean, default=False)
     differential_diagnosis = Column(JSONB, default=[])
-    doctor_notes = Column(Text)
+    doctor_notes = Column(Text, nullable=True)
     status = Column(String(50), default="Pending") # Pending, Completed
     created_at = Column(DateTime, default=func.now())
 
     prescriptions = relationship("Prescription", back_populates="patient", cascade="all, delete-orphan")
     follow_ups = relationship("FollowUp", back_populates="patient", cascade="all, delete-orphan")
+    encounters = relationship("Encounter", back_populates="patient", cascade="all, delete-orphan")
 
 class Prescription(Base):
     __tablename__ = "prescriptions"
@@ -58,3 +61,19 @@ class FollowUp(Base):
     reason = Column(Text)
 
     patient = relationship("Patient", back_populates="follow_ups")
+
+class Encounter(Base):
+    __tablename__ = "encounters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"))
+    symptoms = Column(Text)
+    assessment = Column(Text)
+    severity = Column(Integer)
+    is_red_flag = Column(Boolean, default=False)
+    differential_diagnosis = Column(JSONB, default=[])
+    doctor_notes = Column(Text, nullable=True)
+    status = Column(String(50), default="Pending") # Pending, Completed
+    created_at = Column(DateTime, default=func.now())
+
+    patient = relationship("Patient", back_populates="encounters")

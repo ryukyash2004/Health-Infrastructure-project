@@ -67,7 +67,7 @@ export const useStore = create<UIState>((set, get) => {
   let initialCaseId = null;
   if (typeof document !== 'undefined') {
     const match = document.cookie.match(new RegExp('(^| )case_id=([^;]+)'));
-    if (match) initialCaseId = parseInt(match[2]);
+    if (match) initialCaseId = match[2];
   }
 
   return {
@@ -113,12 +113,17 @@ export const useStore = create<UIState>((set, get) => {
         );
         timeoutId = setTimeout(() => controller.abort(timeoutError), 15000);
 
+        const sessionToken = typeof document !== 'undefined'
+          ? document.cookie.match(new RegExp('(^| )session_token=([^;]+)'))?.[2] || ''
+          : '';
+
         const response = await fetch('http://localhost:8000/api/v1/triage/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-User-Type': 'patient',
-            'X-User-ID': 'user_123'
+            'X-User-ID': 'user_123',
+            'X-Session-Token': sessionToken
           },
           body: JSON.stringify({
             patient_id: caseId,
@@ -158,9 +163,12 @@ export const useStore = create<UIState>((set, get) => {
           content: data.assessment 
         };
 
-        // Save caseId to cookie
+        // Save caseId and sessionToken to cookie
         if (data.patient_id) {
           document.cookie = `case_id=${data.patient_id}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
+        }
+        if (data.session_token) {
+          document.cookie = `session_token=${data.session_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
         }
 
         set((state) => ({ 

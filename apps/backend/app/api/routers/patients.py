@@ -1,21 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
 
 from app.core.database import get_db
-from app.models.patient import Patient, Prescription, FollowUp
+from app.models.patient import Patient, Prescription, FollowUp, Encounter
 from app.schemas.patient import VisitPayload, PatientResponse, PatientQueueItem, PaginatedPatientQueue
 
 router = APIRouter()
 
+# --- WebSocket Connection Manager ---
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
+
+@router.websocket("/ws/queue")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep client connection open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 def optional_text(value: str | None) -> str | None:
     cleaned = value.strip() if isinstance(value, str) else value
     return cleaned if cleaned else None
 
-# FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
 @router.api_route("/queue", methods=["GET", "HEAD"], response_model=PaginatedPatientQueue)
 async def get_patient_queue(
     skip: int = 0, 
@@ -23,61 +52,75 @@ async def get_patient_queue(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Retrieves the triage queue sorted by severity (DESC) and wait time (ASC).
-    Now with pagination support.
+    Retrieves the triage queue from the encounters table sorted by severity (DESC) and creation time (DESC).
+    Now with pagination support and UUID representation.
     """
-    # Get total count
-    count_result = await db.execute(select(func.count(Patient.id)))
+    # Get total count of encounters
+    count_result = await db.execute(select(func.count(Encounter.id)))
     total_count = count_result.scalar_one()
 
-    # Get paginated items
+    # Get paginated encounters joined with their patients
     result = await db.execute(
-        select(Patient)
-        .order_by(Patient.severity.desc(), Patient.created_at.desc())
+        select(Encounter)
+        .options(selectinload(Encounter.patient))
+        .order_by(Encounter.severity.desc(), Encounter.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
-    patients = result.scalars().all()
+    encounters = result.scalars().all()
+    
+    # Format into PatientQueueItem structure using secure patient UUID as id
+    items = []
+    for enc in encounters:
+        items.append({
+            "id": enc.patient.uuid,
+            "patient_name": enc.patient.patient_name,
+            "severity": enc.severity,
+            "visit_date": enc.created_at.strftime("%d %b %Y, %I:%M %p"),
+            "status": enc.status,
+            "is_red_flag": enc.is_red_flag,
+            "created_at": enc.created_at
+        })
     
     return {
-        "items": patients,
+        "items": items,
         "total_count": total_count
     }
 
-# FIX APPLIED HERE: Added HEAD method to support Next.js prefetching
 @router.api_route("/{patient_id}", methods=["GET", "HEAD"])
 async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
     """
-    Retrieves actual patient data from the PostgreSQL database.
+    Retrieves patient data and their latest encounter from the database by patient UUID.
     """
-    try:
-        pid = int(patient_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid patient ID format")
-
     result = await db.execute(
         select(Patient)
-        .options(selectinload(Patient.prescriptions), selectinload(Patient.follow_ups))
-        .where(Patient.id == pid)
+        .options(
+            selectinload(Patient.prescriptions), 
+            selectinload(Patient.follow_ups),
+            selectinload(Patient.encounters)
+        )
+        .where(Patient.uuid == patient_id)
     )
     patient = result.scalar_one_or_none()
 
     if patient:
+        latest_encounter = patient.encounters[-1] if patient.encounters else None
+        
         return {
-            "id": f"AE-{patient.id:05d}", # Formatting for display consistency
-            "db_id": patient.id,
+            "id": f"AE-{patient.id:05d}", # Visual display format consistent with doctor app expectations
+            "db_id": patient.uuid,       # Pass secure UUID as db_id so update actions query by UUID!
             "name": patient.patient_name,
             "age": patient.age,
             "gender": optional_text(patient.gender),
             "blood_group": optional_text(patient.blood_group),
             "contact": optional_text(patient.contact),
-            "visit_date": patient.visit_date or patient.created_at.strftime("%d %b %Y, %I:%M %p"),
-            "visit_type": patient.visit_type or ("EMERGENCY" if patient.is_red_flag else "OPD"),
-            "status": patient.status,
+            "visit_date": latest_encounter.created_at.strftime("%d %b %Y, %I:%M %p") if latest_encounter else patient.created_at.strftime("%d %b %Y, %I:%M %p"),
+            "visit_type": "EMERGENCY" if (latest_encounter and latest_encounter.is_red_flag) else "OPD",
+            "status": latest_encounter.status if latest_encounter else "Pending",
             "clinical_data": {
-                "patient_complaint": patient.symptoms,
-                "history_of_present_illness": patient.patient_history,
-                "past_history": [], # Placeholder
+                "patient_complaint": latest_encounter.symptoms if latest_encounter else "",
+                "history_of_present_illness": patient.patient_history or "",
+                "past_history": [],
                 "skipped_intake_fields": patient.skipped_intake_fields or [],
                 "conditions": patient.conditions or {},
                 "bad_habits": patient.bad_habits or {},
@@ -88,10 +131,10 @@ async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
                 "bowel_movement": optional_text(patient.bowel_movement),
                 "other_history": optional_text(patient.other_history),
                 "ai_assessment": {
-                    "severity_level": patient.severity,
-                    "differential_diagnosis": patient.differential_diagnosis or []
+                    "severity_level": latest_encounter.severity if latest_encounter else 2,
+                    "differential_diagnosis": latest_encounter.differential_diagnosis if latest_encounter else []
                 },
-                "doctor_notes": optional_text(patient.doctor_notes),
+                "doctor_notes": latest_encounter.doctor_notes if latest_encounter else "",
                 "prescriptions": [
                     {
                         "medication": p.medication,
@@ -112,34 +155,40 @@ async def get_patient_data(patient_id: str, db: AsyncSession = Depends(get_db)):
     
     raise HTTPException(status_code=404, detail="Patient not found")
 
-@router.patch("/{patient_id}/visit", response_model=PatientResponse)
+@router.patch("/{patient_id}/visit")
 async def complete_patient_visit(
-    patient_id: int, 
+    patient_id: str, 
     payload: VisitPayload, 
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Updates the patient's record with doctor notes, prescriptions, and follow-ups.
+    Updates the latest encounter for the patient (by UUID) with doctor notes, status, prescriptions, and followups.
     """
-    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    result = await db.execute(
+        select(Patient)
+        .options(selectinload(Patient.encounters))
+        .where(Patient.uuid == patient_id)
+    )
     patient = result.scalar_one_or_none()
 
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    # Update patient notes and status
-    patient.doctor_notes = payload.doctor_notes
-    patient.status = "Completed"
+    if not patient.encounters:
+        raise HTTPException(status_code=400, detail="No active encounter found for this patient")
 
-    # Clear existing prescriptions and follow-ups for this visit update (if any)
-    # In a real app, you might want to manage these more granularly.
-    await db.execute(text("DELETE FROM prescriptions WHERE patient_id = :pid"), {"pid": patient_id})
-    await db.execute(text("DELETE FROM follow_ups WHERE patient_id = :pid"), {"pid": patient_id})
+    latest_encounter = patient.encounters[-1]
+    latest_encounter.doctor_notes = payload.doctor_notes
+    latest_encounter.status = "Completed"
+
+    # Clear existing prescriptions and follow-ups for this patient
+    await db.execute(text("DELETE FROM prescriptions WHERE patient_id = :pid"), {"pid": patient.id})
+    await db.execute(text("DELETE FROM follow_ups WHERE patient_id = :pid"), {"pid": patient.id})
 
     # Add new prescriptions
     for p_data in payload.prescriptions:
         new_p = Prescription(
-            patient_id=patient_id,
+            patient_id=patient.id,
             medication=p_data.medication,
             dosage=p_data.dosage,
             frequency=p_data.frequency,
@@ -151,7 +200,7 @@ async def complete_patient_visit(
     # Add new follow-ups
     for f_data in payload.follow_ups:
         new_f = FollowUp(
-            patient_id=patient_id,
+            patient_id=patient.id,
             follow_up_date=f_data.follow_up_date,
             reason=f_data.reason
         )
@@ -159,14 +208,12 @@ async def complete_patient_visit(
 
     try:
         await db.commit()
-        # Re-fetch with relationships for the response
-        result = await db.execute(
-            select(Patient)
-            .options(selectinload(Patient.prescriptions), selectinload(Patient.follow_ups))
-            .where(Patient.id == patient_id)
-        )
-        patient = result.scalar_one_or_none()
-        return patient
+        
+        # Broadcast WebSocket update trigger to connected doctor dashboards
+        await manager.broadcast("update")
+        
+        # Return updated patient details dictionary
+        return await get_patient_data(patient.uuid, db)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

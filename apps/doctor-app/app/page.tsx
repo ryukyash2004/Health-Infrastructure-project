@@ -78,9 +78,41 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     fetchQueue();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchQueue, 30000);
-    return () => clearInterval(interval);
+
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectWS = () => {
+      // Connect to backend WebSocket for real-time queue updates
+      socket = new WebSocket('ws://localhost:8000/api/v1/patients/ws/queue');
+
+      socket.onopen = () => {
+        console.log('✅ Real-time triage queue updates connected!');
+      };
+
+      socket.onmessage = (event) => {
+        if (event.data === 'update') {
+          console.log('🔄 Queue updated! Refreshing dashboard data...');
+          fetchQueue();
+        }
+      };
+
+      socket.onclose = () => {
+        console.log('❌ Real-time queue socket closed. Reconnecting in 5s...');
+        reconnectTimeout = setTimeout(connectWS, 5000);
+      };
+
+      socket.onerror = (err) => {
+        console.error('⚠️ WebSocket error:', err);
+      };
+    };
+
+    connectWS();
+
+    return () => {
+      if (socket) socket.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
   }, [fetchQueue]);
 
   const stats = {

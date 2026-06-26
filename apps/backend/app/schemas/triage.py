@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class PatientInput(BaseModel):
-    patient_id: Optional[int] = None
+    patient_id: Optional[str] = None
     patient_name: str
     symptoms: str
     patient_history: Optional[str] = "No history provided."
@@ -21,8 +21,9 @@ class PatientInput(BaseModel):
     vaccinations: Optional[dict] = None
 
 class TriageResponse(BaseModel):
-    patient_id: int
+    patient_id: str
     assessment: str
     severity: int
     is_red_flag: bool
     differential_diagnosis: Optional[List[str]] = []
+    session_token: Optional[str] = None

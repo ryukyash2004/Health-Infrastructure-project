@@ -41,7 +41,7 @@ class PatientResponse(BaseModel):
         from_attributes = True
 
 class PatientQueueItem(BaseModel):
-    id: int
+    id: str
     patient_name: str
     severity: int
     visit_date: str
